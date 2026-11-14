@@ -365,7 +365,7 @@ function combatTick(dt){
   // pets & allies
   if(cd.pet){h.petT-=dt*(1+d.petSpeed/100);while(h.petT<=0){h.petT+=cd.pet.int;const t=C.tgt();if(t)petStrike(t,cd.pet.mult,'🐺')}}
   if(S.cls==='warlock'&&(h.impT>0||d.permImp)){h.impT-=dt;h.impAtk-=dt;if(h.impAtk<=0){h.impAtk=1.5;const t=C.tgt();if(t)petStrike(t,d.permImp?Math.max(h.impMult,1.2):h.impMult,'😈')}}
-  if(cd.troops&&h.troops>=1){h.troopT-=dt;if(h.troopT<=0){h.troopT=2;const t=C.tgt();if(t){const r2=calcHit(t,.12*h.troops*(1+d.troopDmg/100),{});dealToEnemy(t,r2.dmg,{crit:r2.crit,capped:r2.capped,icon:'💂',pet:1})}}}
+  if(cd.troops&&h.troops>=1){if(h.troops>(G.S.stats.maxTroops||0))G.S.stats.maxTroops=h.troops;h.troopT-=dt;if(h.troopT<=0){h.troopT=2;const t=C.tgt();if(t){const r2=calcHit(t,.12*h.troops*(1+d.troopDmg/100),{});dealToEnemy(t,r2.dmg,{crit:r2.crit,capped:r2.capped,icon:'💂',pet:1})}}}
   {const sm=relicMod('summonMult')||1;for(const su of S.summons){if(su.role!=='fight')continue;h.sumT[su.uid]=(h.sumT[su.uid]||Math.random()*2.5)-dt;if(h.sumT[su.uid]<=0){h.sumT[su.uid]=2.5;const t=C.tgt();if(t)petStrike(t,.25*su.power*sm,D.SUMMONS.find(x=>x.id===su.type).i)}}}
   if(S.qol.sellsword){h.swT-=dt;if(h.swT<=0){h.swT=2;const t=C.tgt();if(t)petStrike(t,.6,'🗡️')}}
   if(S.qol.acolyte){h.acoT-=dt;if(h.acoT<=0){h.acoT=3;if(h.hp<d.maxHp*.9){heal(d.maxHp*.05*(1+d.petDmg/200))}}}
@@ -589,7 +589,7 @@ function migrate(s){if((s.v||1)>=2)return null;
 function loadFrom(json){const s=JSON.parse(json);deepFill(s,newState());G.migration=migrate(s);G.S=s;syncSlots();G.dirty=true;recalc();newHero();return s}
 function exportSave(){return btoa(unescape(encodeURIComponent(serialize())))}
 function importSave(str){const json=decodeURIComponent(escape(atob(str.trim())));loadFrom(json);save()}
-function snapshot(){const S=G.S;return {gold:S.gold,kills:S.stats.kills,lv:S.classes[S.cls].lvl,profs:D.PROF_ORDER.map(p=>S.profs[p].lvl),found:S.stats.found.slice(),relics:Object.keys(S.relics).length,zone:S.stats.everCleared,mats:Object.assign({},S.mats)}}
+function snapshot(){const S=G.S;return {gold:S.gold,kills:S.stats.kills,lv:S.classes[S.cls].lvl,profs:D.PROF_ORDER.map(p=>S.profs[p].lvl),found:S.stats.found.slice(),relics:Object.keys(S.relics).length,zone:S.stats.everCleared,ap:S.stats.apEarned||0,mats:Object.assign({},S.mats)}}
 function simulate(seconds,step=1){const fx=G.fx;G.fx=false;let t=0;while(t<seconds){const dt=Math.min(step,seconds-t);tick(dt);t+=dt;if(Math.floor(t)%30===0)checkAch()}G.fx=fx;G.ev.length=0;checkAch()}
 function offlineProgress(){const S=G.S;const el=Math.min(offlineCap(),(Date.now()-S.last)/1000);if(el<30)return null;const before=snapshot();const t0=performance.now();
   simulate(el*offlineRate(),el>7200?2:1);const after=snapshot();return {el,before,after,ms:performance.now()-t0}}

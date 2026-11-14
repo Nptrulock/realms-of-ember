@@ -3,7 +3,7 @@
 const $=s=>document.querySelector(s);
 const UI={tab:'adventure',profSel:'mining',invSort:'r',lastPanel:0,enemyEls:new Map(),parts:[],busyInput:false,logFilter:'all',selItem:null};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const TABS=[['adventure','⚔️ Adventure'],['hero','🧝 Hero'],['skills','✨ Skills'],['classes','🎭 Classes'],['profs','⚒️ Professions'],['inv','🎒 Inventory'],['town','🏰 Town'],['codex','🏺 Relics'],['ascend','🌟 Ascend'],['ach','🏆 Feats'],['log','📜 Log'],['settings','⚙️']];
+const TABS=[['adventure','⚔️ Adventure'],['hero','🧝 Hero'],['skills','✨ Skills'],['classes','🎭 Classes'],['profs','⚒️ Professions'],['mastery','🎖️ Mastery'],['inv','🎒 Inventory'],['town','🏰 Town'],['codex','🏺 Relics'],['ascend','🌟 Ascend'],['ach','🏆 Feats'],['log','📜 Log'],['settings','⚙️']];
 const S=()=>G.S;
 function setHTML(el,html){if(!el)return;if(el._h===html)return;if(UI.ptrDown&&el.querySelector('[data-a]'))return;el._h=html;el.innerHTML=html}
 document.addEventListener('pointerdown',()=>{UI.ptrDown=true},true);document.addEventListener('pointerup',()=>{setTimeout(()=>{UI.ptrDown=false},30)},true);document.addEventListener('pointercancel',()=>{UI.ptrDown=false},true);
@@ -28,9 +28,8 @@ function showIntro(){
 }
 
 /* ---------------- top bar ---------------- */
-function renderTop(){const s=S();const sp=gameSpeed();
-  $('#res').innerHTML=`<span class="chip">🪙 ${fmt(s.gold)}</span>${s.shards||s.ascensions?`<span class="chip">🌟 ${fmt(s.shards)}</span>`:''}<span class="chip">✨ ${fmt(s.mats.dust||0)}</span><span class="chip">⚡ ${fmt(G.d.power)}</span>`;
-  $('#speedBtn').textContent=(Math.round(sp*100)/100)+'×';}
+function renderTop(){const s=S();const dc=dailyCap(),dn=Math.min(dc,s.daily.count||0);
+  setHTML($('#res'),`<span class="chip">🪙 ${fmt(s.gold)}</span>${s.shards||s.ascensions?`<span class="chip">🌟 ${fmt(s.shards)}</span>`:''}<span class="chip">✨ ${fmt(s.mats.dust||0)}</span><span class="chip" title="General Action Points">🎖️ ${fmt(Math.floor(s.ap.gen))}</span><span class="chip" title="Daily double-AP actions used today · streak" data-a="tab" data-t="mastery" style="cursor:pointer">📅 ${dn}/${dc}${s.daily.streak>1?' 🔥'+s.daily.streak:''}</span><span class="chip">⚡ ${fmt(G.d.power)}</span>`);}
 
 /* ---------------- stage ---------------- */
 let curBg=null;
@@ -50,7 +49,9 @@ function renderStage(){
   he.classList.toggle('dead',!!(h&&h.dead));he.classList.toggle('shielded',!!(h&&h.shield>1));
   // allies
   const al=[];if(cd.pet)al.push(['pet',cd.pet.i,9,74]);if(s.cls==='warlock'&&h&&(h.impT>0||d.permImp))al.push(['imp','😈',33,30]);if(s.qol.sellsword)al.push(['sw','💂',8,40]);if(s.qol.acolyte)al.push(['aco','🧑‍⚕️',33,76]);
-  const ae=$('#allies');const key=al.map(a=>a[0]).join();if(ae.dataset.k!==key){ae.dataset.k=key;ae.innerHTML=al.map(a=>`<div class="ally" id="ally-${a[0]}" style="left:${a[2]}%;top:${a[3]}%">${a[1]}</div>`).join('')}
+  if(cd.troops&&h){const n=Math.floor(h.troops||0),show=Math.min(8,n);for(let i=0;i<show;i++)al.push(['tr'+i,'💂',14+(i%4)*5,22+Math.floor(i/4)*58+(i%2)*6])}
+  const fs=s.summons.filter(x=>x.role==='fight').slice(0,6);fs.forEach((su,i)=>{const sd=D.SUMMONS.find(x=>x.id===su.type);if(sd)al.push(['su'+su.uid,sd.i,40+(i%2)*6,18+i*12])});
+  const ae=$('#allies');const key=al.map(a=>a[0]).join()+(cd.troops&&h?'|'+Math.floor(h.troops||0):'');if(ae.dataset.k!==key){ae.dataset.k=key;ae.innerHTML=al.map(a=>`<div class="ally ${a[0].startsWith('tr')?'troop':a[0].startsWith('su')?'summon':''}" id="ally-${a[0]}" style="left:${a[2]}%;top:${a[3]}%">${a[1]}</div>`).join('')+(cd.troops&&h&&h.troops>=1?`<div class="troopCount" style="left:18%;top:93%">💂 ×${Math.floor(h.troops)}</div>`:'')}
   // enemies
   const en=inCombat&&G.cb?G.cb.enemies:[];const side=$('#enemySide');const seen=new Set();
   en.forEach((e,i)=>{seen.add(e.uid);let el=UI.enemyEls.get(e.uid);
@@ -70,8 +71,10 @@ function renderBars(){
   if(cd.slots)pips+=`<span class="muted">Spell Slots</span>`+Array.from({length:d.slotMax},(_,i)=>`<span class="pip ${i<h.slots?'on':''}" style="--pc:#7fb0ff"></span>`).join('');
   if(cd.combo)pips+=`<span class="muted">Combo</span>`+Array.from({length:5},(_,i)=>`<span class="pip ${i<h.combo?'on':''}" style="--pc:#ff5a5a"></span>`).join('');
   if(cd.souls)pips+=`<span class="muted">Souls ${h.souls}/${d.soulMax}</span>`;
+  if(cd.troops)pips+=`<span class="muted">💂 Troops ${Math.floor(h.troops||0)}/${Math.floor(d.troopMax)}</span>`;
   const buffs=[...h.buffs.map(b=>`<span class="buff">${b.icon} ${Math.ceil(b.t)}s</span>`)];
   if(s.meal){const rc=D.PROFS.cooking.recipes.find(x=>x.id===s.meal.id);buffs.push(`<span class="buff">${rc.i}${s.meal.p?'✨':''} ${s.relics.ladle?'∞':fmtTime(s.meal.t)}</span>`)}
+  if(s.dance&&s.dance.t>0){const dd=D.DANCES.find(x=>x.id===s.dance.id);if(dd)buffs.push(`<span class="buff" title="Grace: ${dd.bd}">${dd.i} ${fmtTime(s.dance.t)}</span>`)}
   for(const k in s.elix)if(s.elix[k]>0){const rc=D.PROFS.alchemy.recipes.find(x=>x.id===k);buffs.push(`<span class="buff">${rc.i} ${fmtTime(s.elix[k])}</span>`)}
   const pot=[1,2,3,4,5].reduce((a,t)=>a+(s.potions[t]||0),0);
   setHTML($('#heroBars'),`
@@ -90,14 +93,17 @@ function renderBars(){
   setHTML($('#zoneBar'),inCombat?`${bar(zs.kills/D.KILLS_TO_BOSS,'kfill',G.cb&&G.cb.boss?`👑 BOSS: ${z.boss.n}`:full?'Boss ready!':`Hunt ${zs.kills}/${D.KILLS_TO_BOSS} to face ${z.boss.n}`)}
    ${full&&!(G.cb&&G.cb.boss)?btn('boss',s.bossRetry>0&&!s.bossReq?`⏳ ${Math.ceil(s.bossRetry)}s`:s.bossReq?'Summoning…':'👑 Fight Boss',{cls:'gold sm'}):''}`:`<span class="muted">Hero is busy with a profession. ${btn('goFight','⚔️ Return to battle',{cls:'sm'})}</span>`);
 }
+const SCENE_ICON={mining:'⛏️',smithing:'🔨',alchemy:'⚗️',cooking:'🍳',enchanting:'🔮',herbalism:'🌱',summoning:'🔯',dancing:'💃',praying:'🙏',advising:'📜',bard:'🎻',fishing:'🎣'};
 function renderProfScene(){
   const s=S(),sl=s.slots[0],p=sl.act&&sl.act.p;const ps=$('#profScene');if(!p){ps.dataset.k='';ps.innerHTML='<div class="pscene">🏕️</div><div class="pstatus">Resting at camp</div>';return}
   const pd=D.PROFS[p];let inner='';const prog=sl.prog||0;
   if(p==='herbalism'){inner=`<div style="width:90%">${plotsHtml()}</div>`}
   else if(p==='smithing'){const t=s.ps.smithing.target;inner=`<div class="heatbar"><b style="left:${t}%"></b><i style="left:${Math.min(100,sl.heat)}%"></i></div>`}
+  else if(p==='dancing'){const c=s.ps.dancing.combo||0;inner=`<div class="pips" style="justify-content:center;margin-top:6px">${Array.from({length:8},(_,i)=>`<span class="pip ${i<c?'on':''}" style="--pc:#ff7ad9"></span>`).join('')}</div><div style="width:220px;margin-top:6px">${bar(prog,'kfill')}</div>`}
+  else if(p==='fishing'){inner=`<div style="width:220px;margin-top:8px">${bar(prog,'kfill',sl.need?'Waiting for a bite…':'Casting…')}</div>`}
   else inner=`<div style="width:220px;margin-top:8px">${bar(prog,'kfill')}</div>`;
   const key=p+(p==='herbalism'?'':'');
-  if(ps.dataset.k!==key){ps.dataset.k=key;ps.innerHTML=`<div class="pscene ${p}">${p==='mining'?'⛏️':p==='smithing'?'🔨':p==='alchemy'?'⚗️':p==='cooking'?'🍳':p==='enchanting'?'🔮':'🌱'}</div><div class="pstatus"></div><div class="pin" style="width:100%;display:flex;justify-content:center"></div>`}
+  if(ps.dataset.k!==key){ps.dataset.k=key;ps.innerHTML=`<div class="pscene ${p}">${SCENE_ICON[p]||'🌱'}</div><div class="pstatus"></div><div class="pin" style="width:100%;display:flex;justify-content:center"></div>`}
   ps.querySelector('.pstatus').innerHTML=`${pd.i} ${pd.n} (Lv ${s.profs[p].lvl}) — ${profTarget(p)} ${sl.note?`<span style="color:#ff8a8a">· ${sl.note}</span>`:''}`;
   ps.querySelector('.pin').innerHTML=inner;
 }
@@ -107,7 +113,13 @@ function profTarget(p){const s=S();switch(p){
   case'smithing':{const t=D.PROFS.smithing.tiers.find(x=>x.id===s.ps.smithing.tier);return `${t.n} ${D.SLOT_NAME[s.ps.smithing.slot]} @ ${s.ps.smithing.target}°`}
   case'alchemy':{const r=D.PROFS.alchemy.recipes.find(x=>x.id===s.ps.alchemy.recipe);return `${r.i} ${r.n}`}
   case'cooking':{const r=D.PROFS.cooking.recipes.find(x=>x.id===s.ps.cooking.recipe);return `${r.i} ${r.n}`}
-  case'enchanting':{const it=s.equip[s.ps.enchanting.slot];return it?`${D.SLOT_NAME[it.slot]} +${it.ench||0}`:'(empty slot)'}}}
+  case'enchanting':{const it=s.equip[s.ps.enchanting.slot];return it?`${D.SLOT_NAME[it.slot]} +${it.ench||0}`:'(empty slot)'}
+  case'summoning':{const x=D.SUMMONS.find(y=>y.id===s.ps.summoning.target);return `${x.i} ${x.n} · ${s.summons.length}/${summonCap()} bound`}
+  case'dancing':{const x=D.DANCES.find(y=>y.id===s.ps.dancing.target);return `${x.i} ${x.n} · combo ${s.ps.dancing.combo||0}/8`}
+  case'praying':{const x=D.DEITIES.find(y=>y.id===s.ps.praying.target);return `${x.i} ${x.n.split(',')[0]} · tier ${favorTier(s.ps.praying.favor[x.id]||0)}`}
+  case'advising':{const x=D.PETITIONERS.find(y=>y.id===s.ps.advising.target);return `${x.i} ${x.n} · rep ${fmt(s.ps.advising.rep||0)}`}
+  case'bard':{const x=D.SONGS.find(y=>y.id===s.ps.bard.target);return `${x.i} ${x.n} · fame ${fmt(s.ps.bard.fame||0)}`}
+  case'fishing':{const x=D.FISHING.find(y=>y.id===s.ps.fishing.target);return `${x.i} ${x.n} · 🐟 ${fmt(s.mats.fish||0)}`}}}
 function plotsHtml(){const s=S(),hs=s.ps.herbalism;const n=plotsCount();let h='<div class="plots">';for(let i=0;i<n;i++){const p=hs.plots[i];
   if(!p){h+=`<div class="plot">🟫<small>empty</small></div>`;continue}const f=p.g/p.max;const st=f>=1?D.MATS[p.s].i:f>.6?'🌿':f>.25?'🌱':'🌰';
   h+=`<div class="plot ${p.gold?'gold':''}">${st}<small>${f>=1?'Ripe!':Math.ceil((p.max-p.g))+'s'}</small><div class="pb"><i style="width:${f*100}%"></i></div></div>`}return h+'</div>'}
@@ -146,6 +158,13 @@ function processEvents(){
     case'loot':if(e.r>=4){toast(`<span class="r${e.r}">★ ${D.RARITIES[e.r].name} item found!</span>`);burst(hp[0],hp[1],D.RARITIES[e.r].color,30,160)}break;
     case'relic':{const r=D.RELICS.find(x=>x.id===e.id);banner(`🏺 RELIC FOUND<br>${r.i} ${esc(r.n)}`);toast(`<b class="relic">${r.i} ${esc(r.n)}</b><br>${esc(r.d)}`,9000);break}
     case'ach':toast(`🏆 <b>${esc(e.n)}</b>`);break;
+    case'miss':{const el=UI.enemyEls.get(e.uid);if(el&&hits<14){const p=stageCoords(el.querySelector('.spr'));floater(p[0],p[1]-30,'miss','info')}break}
+    case'gold':{const el=UI.enemyEls.get(e.uid);if(el){const p=stageCoords(el.querySelector('.spr'));floater(p[0],p[1]-50,'🪙+'+fmt(e.a),'crit');burst(p[0],p[1],'#ffd34d',10,120)}break}
+    case'troopLoss':floater(hp[0]-60,hp[1]-60,'💂 fell!','hurt');break;
+    case'deed':toast('📜 <b>Daily deed complete!</b> +AP & gold');break;
+    case'fail':case'fizzle':case'summon':case'step':case'routine':case'pray':case'counsel':case'song':case'fish':{const sc=document.querySelector('#profScene .pscene');if(sc&&$('#profScene').classList.contains('on')&&e.si===0){const p=stageCoords(sc);
+      const T={fail:['✖ Failed','hurt','#777'],fizzle:['💨 Fizzled','hurt','#777'],summon:['🔯 Bound!','info','#b57bff'],step:['♪ Step','info','#ff7ad9'],routine:['💃 Routine complete!','crit','#ff7ad9'],pray:['🙏 Favor','info','#ffe9a3'],counsel:['📜 +🪙'+fmt(e.a||0),'info','#ffd34d'],song:[e.enc?'🎻 ENCORE!':'🎵 Applause','info','#7fd3ff'],fish:['🎣 Catch!','info','#6fd0ff']}[e.t];
+      floater(p[0],p[1]-50,T[0],T[1]);burst(p[0],p[1],T[2],e.t==='routine'||e.enc?24:10,130);sc.classList.remove('bob');void sc.offsetWidth;sc.classList.add('bob');setTimeout(()=>sc.classList.remove('bob'),360)}break}
     case'mine':case'forge':case'brew':case'cook':case'harvest':{const sc=document.querySelector('#profScene .pscene');if(sc&&$('#profScene').classList.contains('on')){const p=stageCoords(sc);burst(p[0],p[1],e.t==='forge'?'#ffb347':e.t==='brew'?'#7cf':e.t==='mine'?'#ddd':'#8f8',14,140);if(e.t!=='mine')floater(p[0],p[1]-50,e.t==='forge'?'Forged!':e.t==='brew'?'Brewed!':e.t==='cook'?'Cooked!':e.gold?'🌟 Golden!':'Harvest!','info')}break}
     case'crack':case'burn':{const sc=document.querySelector('#profScene .pscene');if(sc&&$('#profScene').classList.contains('on')){const p=stageCoords(sc);floater(p[0],p[1]-50,e.t==='crack'?'💥 Cracked!':'🔥 Burnt!','hurt')}break}
     case'ench':{const sc=document.querySelector('#profScene .pscene');if(sc&&$('#profScene').classList.contains('on')){const p=stageCoords(sc);floater(p[0],p[1]-50,e.ok?'✨ Success!':'Failed','info');burst(p[0],p[1],e.ok?'#c58bff':'#666',20,150)}break}
@@ -186,8 +205,8 @@ P.hero=()=>{const s=S(),d=G.d,cd=D.CLASSES[s.cls];
   return `<h2>🧝 ${esc(s.name)} the ${cd.n}</h2>
   <div class="doll">${doll}</div>
   <div class="grid" style="--min:230px;margin-top:10px"><div class="card"><h3 style="margin-top:0">Attributes</h3>${D.STATS.map(k=>st((k===cd.main?'★ ':'')+D.STAT_NAMES[k],fmt(d[k]))).join('')}</div>
-  <div class="card"><h3 style="margin-top:0">Combat</h3>${st('Power',fmt(d.power))}${st('Est. DPS',fmt(d.dps))}${st('Max HP',fmt(d.maxHp))}${st('Weapon damage',fmt(d.weaponDmg))}${st('Damage bonus','+'+fmt(d.dmgPct)+'%')}${st('Crit',d.crit.toFixed(1)+'% / +'+fmt(d.critDmg)+'%')}${st('Attack interval',d.atkInt.toFixed(2)+'s')}${st('Armor',fmt(d.armor))}${st('Damage reduction',d.dr.toFixed(0)+'%')}${st('Dodge',d.dodge.toFixed(1)+'%')}${st('Lifesteal',d.lifesteal.toFixed(1)+'%')}${st('Damage cap / hit',d.cap===Infinity?'∞ (Unbound)':fmt(d.cap))}</div>
-  <div class="card"><h3 style="margin-top:0">Fortune</h3>${st('Gold find','+'+fmt(d.gold)+'%')}${st('XP bonus','+'+fmt(d.xp)+'%')}${st('Magic find','+'+fmt(d.mf)+'%')}${st('Skill damage','+'+fmt(d.skillDmg)+'%')}${st('Pet/ally damage','+'+fmt(d.petDmg)+'%')}${st('Profession speed','+'+fmt(d.profSpeed)+'%')}${st('Achievements',Object.keys(s.ach).length+' (+'+Object.keys(s.ach).length+'% dmg & gold)')}${st('Relics',Object.keys(s.relics).length+' / '+D.RELICS.length)}</div></div>
+  <div class="card"><h3 style="margin-top:0">Combat</h3>${st('Power',fmt(d.power))}${st('Est. DPS',fmt(d.dps))}${st('Max HP',fmt(d.maxHp))}${st('Weapon damage',fmt(d.weaponDmg))}${st('Damage bonus','+'+fmt(d.dmgPct)+'%')}${st('Crit',d.crit.toFixed(1)+'% / +'+fmt(d.critDmg)+'%')}${st('Attack interval',d.atkInt.toFixed(2)+'s')}${st('Hit chance',d.hit.toFixed(0)+'%')}${st('Armor',fmt(d.armor))}${st('Damage reduction',d.dr.toFixed(0)+'%')}${st('Dodge',d.dodge.toFixed(1)+'%')}${st('Lifesteal',d.lifesteal.toFixed(1)+'%')}${st('Damage cap / hit',d.cap===Infinity?'∞ (Unbound)':fmt(d.cap))}</div>
+  <div class="card"><h3 style="margin-top:0">Fortune</h3>${st('Gold find','+'+fmt(d.gold)+'%')}${st('XP bonus','+'+fmt(d.xp)+'%')}${st('Magic find','+'+fmt(d.mf)+'%')}${st('Skill damage','+'+fmt(d.skillDmg)+'%')}${st('Pet/ally damage','+'+fmt(d.petDmg)+'%')}${st('Profession speed','+'+fmt(d.profSpeed)+'%')}${st('Action speed (all)','+'+fmt(d.actSpeed||0)+'%')}${st('Action Point bonus','+'+fmt(d.apPct||0)+'%')}${st('Relic luck','+'+fmt(d.relicLuck||0)+'%')}${st('Achievements',Object.keys(s.ach).length+' (+'+Object.keys(s.ach).length+'% dmg & gold)')}${st('Relics',Object.keys(s.relics).length+' / '+D.RELICS.length)}</div></div>
   <h3>🧪 Potions</h3><div class="row">${pots}</div><p class="muted">${s.qol.autoQuaff?`Potion Belt drinks automatically below ${s.settings.quaffAt}% HP.`:'Buy the Potion Belt in Town to drink potions automatically in combat.'}</p>
   <h3>🧴 Elixirs</h3><div class="row">${elix}</div>
   <h3>🍽️ Meals</h3><div class="row">${food}</div>`;};
@@ -213,13 +232,42 @@ P.profs=()=>{const s=S(),p=UI.profSel,pd=D.PROFS[p],pr=s.profs[p];const info=act
   let h=`<h2>⚒️ Professions</h2><div class="grid" style="--min:150px">${D.PROF_ORDER.map(q=>{const x=s.profs[q];const who=s.slots.map((sl,i)=>sl.act&&sl.act.p===q?(i?'🧑‍🔧':'🧝'):'').join('');return `<div class="card ${q===p?'sel':''}" data-a="profSel" data-p="${q}" style="cursor:pointer"><div class="hd"><span class="ic">${D.PROFS[q].i}</span><div class="sp"><b>${D.PROFS[q].n}</b><div class="small">Lv ${x.lvl} ${who}</div></div></div>${bar(x.xp/profXpNeed(x.lvl),'xpfill')}</div>`}).join('')}</div>`;
   h+=`<div class="card" style="margin-top:10px"><div class="hd"><span class="ic">${pd.i}</span><div class="sp"><b class="cinzel">${pd.n}</b> — Level ${pr.lvl} <span class="muted">(${fmt(pr.xp)}/${fmt(profXpNeed(pr.lvl))} xp)</span><div class="small">${pd.mech}</div></div></div>
    <div class="row" style="margin-top:6px">Assign: ${s.slots.map((sl,i)=>btn('assign',(i?'🧑‍🔧 '+info[i].n:'🧝 Hero')+(sl.act&&sl.act.p===p?' ✅':''),{data:{si:i,k:p},cls:'sm'+(sl.act&&sl.act.p===p?' on':'')})).join('')}</div>
-   <div class="row small" style="margin-top:6px">🔧 Tools: ${D.TOOLS.names[s.tools[p]||0]} (+${15*(s.tools[p]||0)}% speed) ${(s.tools[p]||0)<D.TOOLS.max?btn('tool',`Upgrade ${costTxt(upgradeCost(D.TOOLS.base,D.TOOLS.mult,s.tools[p]||0))}`,{data:{p},cls:'sm'}):''}</div></div>`;
+   <div class="row small" style="margin-top:6px">🎖️ ${pd.n} AP: <b>${fmt(Math.floor(s.ap.prof[p]||0))}</b> ${btn('goMastery','Spend in Mastery →',{data:{p},cls:'sm'})}<span class="muted">Speed ×${profSpeed(0,p).toFixed(2)} (hero) · bonus yield ${((G.d.bounty||0)+pm(p,'bounty')*3).toFixed(0)}%</span></div>
+   <div class="row small" style="margin-top:6px">🔧 Tools: ${D.TOOLS.names[s.tools[p]||0]} (+${15*(s.tools[p]||0)}% speed) ${(s.tools[p]||0)<D.TOOLS.max?btn('tool',`Upgrade ${costTxt(townCost(upgradeCost(D.TOOLS.base,D.TOOLS.mult,s.tools[p]||0)))}`,{data:{p},cls:'sm'}):''}</div></div>`;
   h+=profDetail(p);return h;};
+const MODN={dmgPct:'damage',regenPct:'HP regen/s',hpPct:'max HP',profSpeed:'profession speed',xp:'XP',profXp:'profession XP',crit:'crit'};
+function profDetail2(p,lv){const s=S();let h='';const t=(x)=>`Lv ${x.lv} · ${x.t}s · ${succ(p,x.lv)}`;
+  if(p==='summoning'){const ss=s.ps.summoning,cap=summonCap();
+    h=`<h3>Rituals</h3><div class="grid" style="--min:170px">${D.SUMMONS.map(x=>selCard('setSum',{id:x.id},ss.target===x.id,lv<x.lv,`<b>${x.i} ${x.n}</b><div class="small">${t(x)}<br>Base power ${x.power} (×${(1+lv*.02).toFixed(2)} at your level)<br>${Object.keys(x.in).length?matsHave(x.in):'No materials'}</div>`)).join('')}</div>
+    <h3>Bestiary ${s.summons.length}/${cap}</h3><p class="small muted">⚔️ Fighters strike beside your hero every 2.5s for 25% of power × damage. 🔧 Workers add power×3% speed to their profession. Roster +1 every 12 levels.</p>
+    <div class="grid" style="--min:200px">${s.summons.map(su=>{const sd=D.SUMMONS.find(x=>x.id===su.type);return `<div class="card"><div class="hd"><span class="ic">${sd.i}</span><div class="sp"><b>${sd.n}</b><div class="small">Power ${su.power} · ${su.role==='fight'?'⚔️ Fighting':'🔧 Working: '+D.PROFS[su.role].n}</div></div></div>
+      <select data-sel="sumRole" data-uid="${su.uid}"><option value="fight" ${su.role==='fight'?'selected':''}>⚔️ Fight beside hero</option>${D.PROF_ORDER.filter(q=>q!=='summoning').map(q=>`<option value="${q}" ${su.role===q?'selected':''}>🔧 Work: ${D.PROFS[q].n}</option>`).join('')}</select>
+      <div style="margin-top:4px">${btn('releaseSum','Release',{data:{uid:su.uid},cls:'sm red'})}</div></div>`}).join('')||'<span class="muted">No creatures bound yet.</span>'}</div>`}
+  if(p==='dancing'){const ds=s.ps.dancing;const cur=s.dance&&s.dance.t>0?D.DANCES.find(x=>x.id===s.dance.id):null;
+    h=`<h3>Dances · combo ${ds.combo||0}/8 ${cur?`· Grace active: ${cur.i} ${cur.bd} (${fmtTime(s.dance.t)})`:''}</h3><div class="pips" style="margin-bottom:6px">${Array.from({length:8},(_,i)=>`<span class="pip ${i<(ds.combo||0)?'on':''}" style="--pc:#ff7ad9"></span>`).join('')}</div>
+    <div class="grid" style="--min:180px">${D.DANCES.map(x=>selCard('setDance',{id:x.id},ds.target===x.id,lv<x.lv,`<b>${x.i} ${x.n}</b><div class="small">${t(x)}<br>Grace: ${x.bd}<br>Chance to land 8 in a row: ${(Math.pow(profSucc('dancing',x.lv),8)*100).toFixed(1)}%</div>`)).join('')}</div>
+    <p class="small muted">Each completed routine adds 5 minutes of Grace (max 60) and earns tips. Switching dances replaces the Grace buff.</p>`}
+  if(p==='praying'){const pr=s.ps.praying;
+    h=`<h3>Pantheon — only your current patron blesses you</h3><div class="grid" style="--min:220px">${D.DEITIES.map(x=>{const f=pr.favor[x.id]||0,tr=favorTier(f),nx=10*(Math.pow(2,tr+1)-1);return selCard('setDeity',{id:x.id},pr.target===x.id,lv<x.lv,`<b>${x.i} ${x.n}</b><div class="small">${t(x)}<br>Favor ${fmt(Math.floor(f))} · Tier <b>${tr}</b>/10${tr<10?` (next at ${fmt(nx)})`:''}<br>Blessing now: ${tr?x.bd(tr):'—'}<br><span class="muted">At tier 10: ${x.bd(10)}</span></div>${bar(tr>=10?1:(f-10*(Math.pow(2,tr)-1))/(nx-10*(Math.pow(2,tr)-1)),'xpfill')}`)}).join('')}</div>
+    <p class="small muted">Favor per prayer: ${(1+lv/20).toFixed(2)}. Each tier needs double the favor of the last. 0.5% of prayers are miracles (+25 general AP).</p>`}
+  if(p==='advising'){const as=s.ps.advising,rep=as.rep||0;
+    h=`<h3>Petitioners · Reputation <b>${fmt(Math.floor(rep))}</b></h3><div class="grid" style="--min:190px">${D.PETITIONERS.map(x=>selCard('setPet',{id:x.id},as.target===x.id,lv<x.lv,`<b>${x.i} ${x.n}</b><div class="small">${t(x)}<br>Fee 🪙${fmt(x.gold*(1+rep/500))} · +${x.rep} rep<br><span class="r5">Bad counsel: −${x.rep*2} rep</span></div>`)).join('')}</div>
+    <h3>Court perks</h3>${D.REP_PERKS.map(pk=>`<div class="small">${rep>=pk.at?'✅':'🔒'} <b>${fmt(pk.at)}</b> rep — ${pk.d}</div>`).join('')}`}
+  if(p==='bard'){const bs=s.ps.bard;
+    h=`<h3>Songbook · Fame ${fmt(bs.fame||0)} · encore ${(Math.min(.3,(bs.fame||0)/5000)*100).toFixed(1)}%</h3><div class="grid" style="--min:210px">${D.SONGS.map(x=>{const m=bs.mastery[x.id]||0;const str=m/100*(1+lv/100)*(s.relics.lute?2:1);return selCard('setSong',{id:x.id},bs.target===x.id,lv<x.lv,`<b>${x.i} ${x.n}</b>${bs.anthem===x.id?' <span class="pill">🎺 Anthem</span>':''}<div class="small">${t(x)}<br>Anthem effect now: ${Object.entries(x.mods).map(([k,v])=>`+${(v*str).toFixed(1)}% ${MODN[k]||k}`).join(', ')||'—'}<br>Mastery ${m}/100</div>${bar(m/100,'xpfill')}`)}).join('')}</div>
+    <div class="row" style="margin-top:6px">Anthem: ${D.SONGS.filter(x=>lv>=x.lv).map(x=>btn('setAnthem',x.i+' '+x.n,{data:{id:x.id},cls:'sm'+(bs.anthem===x.id?' on':'')})).join('')}</div>
+    <p class="small muted">Your Anthem buffs you at all times: song effect × mastery% × (1 + Bard level/100). Practise a song to raise its mastery.</p>`}
+  if(p==='fishing'){const fs=s.ps.fishing;
+    h=`<h3>Fishing spots · 🐟 ${fmt(s.mats.fish||0)} fish</h3><div class="grid" style="--min:180px">${D.FISHING.map(x=>selCard('setFish',{id:x.id},fs.target===x.id,lv<x.lv,`<b>${x.i} ${x.n}</b><div class="small">Lv ${x.lv} · bite in ${(x.t*.5).toFixed(0)}–${(x.t*1.8).toFixed(0)}s · ${succ('fishing',x.lv)}<br>${x.fish} fish per catch · 2% sunken treasure</div>`)).join('')}</div>
+    <p class="small muted">Fish are used by Cooking (Grilled Trout, Seafarer's Chowder).</p>`}
+  return h}
 function selCard(a,data,sel,lock,inner){const attrs=Object.entries(data).map(([k,v])=>`data-${k}="${v}"`).join(' ');return `<div class="card ${sel?'sel':''} ${lock?'locked':''}" ${lock?'':`data-a="${a}" ${attrs}`} style="cursor:pointer">${inner}</div>`}
 function matsHave(inp){const s=S();return Object.entries(inp).map(([k,n])=>`<span class="${(s.mats[k]||0)>=n?'':'r5'}">${D.MATS[k].i}${n} <span class="muted">(${fmt(s.mats[k]||0)})</span></span>`).join(' ')}
+function succ(p,req){const v=profSucc(p,req);return `<span class="${v<.5?'r5':v>.85?'r1':''}">✔ ${(v*100).toFixed(0)}%</span>`}
 function profDetail(p){const s=S(),lv=s.profs[p].lvl;let h='';
-  if(p==='mining'){h=`<h3>Veins · Lode streak ${s.ps.mining.streak||0}/20 (+${(s.ps.mining.streak||0)*5}% yield)</h3><div class="grid" style="--min:170px">${D.PROFS.mining.nodes.map(n=>selCard('setNode',{id:n.id},s.ps.mining.node===n.id,lv<n.lv,`<b>${D.MATS[n.id].i} ${D.MATS[n.id].n}</b><div class="small">Lv ${n.lv} · ${n.t}s · ${n.xp} xp<br>Gem: ${D.MATS[n.gem].i} ${D.MATS[n.gem].n}<br>Owned: ${fmt(s.mats[n.id]||0)}</div>`)).join('')}</div>`}
-  if(p==='herbalism'){h=`<h3>Seeds</h3><div class="grid" style="--min:150px">${D.PROFS.herbalism.seeds.map(n=>selCard('setSeed',{id:n.id},s.ps.herbalism.seed===n.id,lv<n.lv,`<b>${D.MATS[n.id].i} ${D.MATS[n.id].n}</b><div class="small">Lv ${n.lv} · ${n.t}s grow · ${n.xp} xp<br>Owned: ${fmt(s.mats[n.id]||0)}</div>`)).join('')}</div>
+  if(D.PROFS[p].kind==='perform'||p==='summoning'||p==='fishing')h+=profDetail2(p,lv);
+  if(p==='mining'){h=`<h3>Veins · Lode streak ${s.ps.mining.streak||0}/20 (+${(s.ps.mining.streak||0)*5}% yield)</h3><div class="grid" style="--min:170px">${D.PROFS.mining.nodes.map(n=>selCard('setNode',{id:n.id},s.ps.mining.node===n.id,lv<n.lv,`<b>${D.MATS[n.id].i} ${D.MATS[n.id].n}</b><div class="small">Lv ${n.lv} · ${n.t}s · ${succ('mining',n.lv)}<br>Gem: ${D.MATS[n.gem].i} ${D.MATS[n.gem].n}<br>Owned: ${fmt(s.mats[n.id]||0)}</div>`)).join('')}</div>`}
+  if(p==='herbalism'){h=`<h3>Seeds</h3><div class="grid" style="--min:150px">${D.PROFS.herbalism.seeds.map(n=>selCard('setSeed',{id:n.id},s.ps.herbalism.seed===n.id,lv<n.lv,`<b>${D.MATS[n.id].i} ${D.MATS[n.id].n}</b><div class="small">Lv ${n.lv} · ${n.t}s grow · ${succ('herbalism',n.lv)}<br>Owned: ${fmt(s.mats[n.id]||0)}</div>`)).join('')}</div>
     <h3>Garden — ${plotsCount()} plots ${s.qol.autoHarvest?'· 🎃 Scarecrow active':''}</h3>${plotsHtml()}<p class="muted">Yield ${2+Math.floor(lv/15)} per plot · golden mutation ${(3+lv*.05).toFixed(1)}% · +1 plot per 20 levels, more in Town.</p>`}
   if(p==='smithing'){const ss=s.ps.smithing,t=D.PROFS.smithing.tiers.find(x=>x.id===ss.tier),cr=crackChance(ss.target);
     h=`<h3>Metal</h3><div class="grid" style="--min:160px">${D.PROFS.smithing.tiers.map(n=>selCard('setTier',{id:n.id},ss.tier===n.id,lv<n.lv,`<b>${n.n}</b><div class="small">Lv ${n.lv} · item level ${n.il}+<br>${D.MATS[n.ore].i} ${D.MATS[n.ore].n} + ${D.MATS[n.mat].i} ${D.MATS[n.mat].n}</div>`)).join('')}</div>
@@ -227,12 +275,27 @@ function profDetail(p){const s=S(),lv=s.profs[p].lvl;let h='';
     <h3>Strike temperature: ${ss.target}°</h3><input type="range" min="40" max="100" value="${ss.target}" data-in="smithTarget">
     <div class="row small"><span>Crack chance: <b class="${cr>.1?'r5':''}">${(cr*100).toFixed(1)}%</b></span><span>Quality bonus: <b class="r3">+${Math.round((ss.target-40)*3+lv*1.5)}% rarity</b></span><span>Time: ${(ss.target/12).toFixed(1)}s</span></div>
     <p class="small">Cost: ${matsHave(smithCost(t,ss.slot))} · Forged items are at least Uncommon, 5% Masterwork (+1 rarity).</p>`}
-  if(p==='alchemy'){const as=s.ps.alchemy;h=`<h3>Recipes</h3><div class="grid" style="--min:200px">${D.PROFS.alchemy.recipes.map(r=>{const m=as.mastery[r.id]||0;return selCard('setAlch',{id:r.id},as.recipe===r.id,lv<r.lv,`<b>${r.i} ${r.n}</b><div class="small">Lv ${r.lv} · ${r.pot?`heals ${Math.round(r.heal*100*(1+m/200))}%`:Object.entries(r.elix).map(([k,v])=>`+${Math.round(v*(1+m/200))}% ${k}`).join(', ')+` · 5 min`}<br>${matsHave(r.in)}<br>Owned: ${r.pot?(s.potions[r.pot]||0):(s.elixirs[r.id]||0)}</div><div class="small">Mastery ${m}/100</div>${bar(m/100,'xpfill')}`)}).join('')}</div>`}
-  if(p==='cooking'){const cs=s.ps.cooking;h=`<h3>Recipes</h3><div class="grid" style="--min:200px">${D.PROFS.cooking.recipes.map(r=>{const c=cs.count[r.id]||0,diff=lv-r.lv,burn=Math.max(.02,.4-diff*.03),perf=Math.min(.3,Math.max(0,diff*.015));const tier=c>=500?3:c>=100?2:c>=25?1:0;
+  if(p==='alchemy'){const as=s.ps.alchemy;h=`<h3>Recipes</h3><div class="grid" style="--min:200px">${D.PROFS.alchemy.recipes.map(r=>{const m=as.mastery[r.id]||0;return selCard('setAlch',{id:r.id},as.recipe===r.id,lv<r.lv,`<b>${r.i} ${r.n}</b><div class="small">Lv ${r.lv} · ${succ('alchemy',r.lv)} · ${r.pot?`heals ${Math.round(r.heal*100*(1+m/200))}%`:Object.entries(r.elix).map(([k,v])=>`+${Math.round(v*(1+m/200))}% ${k}`).join(', ')+` · 5 min`}<br>${matsHave(r.in)}<br>Owned: ${r.pot?(s.potions[r.pot]||0):(s.elixirs[r.id]||0)}</div><div class="small">Mastery ${m}/100</div>${bar(m/100,'xpfill')}`)}).join('')}</div>`}
+  if(p==='cooking'){const cs=s.ps.cooking;h=`<h3>Recipes</h3><div class="grid" style="--min:200px">${D.PROFS.cooking.recipes.map(r=>{const c=cs.count[r.id]||0,diff=lv-r.lv,burn=1-profSucc('cooking',r.lv),perf=Math.min(.3,Math.max(0,diff*.015));const tier=c>=500?3:c>=100?2:c>=25?1:0;
     return selCard('setCook',{id:r.id},cs.recipe===r.id,lv<r.lv,`<b>${r.i} ${r.n}</b><div class="small">Lv ${r.lv} · ${Object.entries(r.buff).map(([k,v])=>`+${v}% ${k}`).join(', ')} · 10 min<br>${matsHave(r.in)}<br>🔥 burn ${(burn*100).toFixed(0)}% · ✨ perfect ${(perf*100).toFixed(0)}%<br>Signature ${'★'.repeat(tier)}${'☆'.repeat(3-tier)} (${c}/${tier>=3?500:[25,100,500][tier]}) · Owned ${(s.food[r.id]||0)}+${(s.foodP[r.id]||0)}✨</div>`)}).join('')}</div>`}
   if(p==='enchanting'){const es=s.ps.enchanting;h=`<h3>Target (equipped item) · ✨ Dust: ${fmt(s.mats.dust||0)}</h3><div class="grid" style="--min:170px">${D.SLOTS.map(sl=>{const it=s.equip[sl];return selCard('setEnch',{sl},es.slot===sl,!it,it?`<b class="r${it.r}">${D.SLOT_ICON[sl]} ${D.SLOT_NAME[sl]} +${it.ench||0}</b><div class="small">${esc(it.n)}<br>${it.ench>=15?'MAX':`Cost ✨${fmt(enchCost(it))} · ${enchChance(it).toFixed(0)}% success`}</div>`:`<b>${D.SLOT_NAME[sl]}</b><div class="small">empty</div>`)}).join('')}</div>
     <div class="row" style="margin-top:8px">${btn('toggleWard',es.ward?'✅ Use gems as wards':'⬜ Use gems as wards',{cls:'sm'})}<span class="muted">Gems: ${['amethyst','ruby','sapphire','emerald','diamond'].map(g=>D.MATS[g].i+(s.mats[g]||0)).join(' ')}</span></div><p class="muted">Get dust by salvaging gear in the Inventory (or set the Loot Filter to Salvage).</p>`}
   return h;}
+function mNode(tree,key,n,ranks,pool){const r=(ranks||{})[n.id]||0,mx=r>=n.max,c=mx?0:masteryCost(n,r);
+  return `<div class="card mnode ${mx?'sel':''}"><div class="hd"><span class="ic">${n.i||'⭐'}</span><div class="sp"><b>${n.n}</b> <span class="pill">${r}/${n.max}</span><div class="small">${r?n.d(r):n.d(1)}${!mx&&r?`<br><span class="muted">Next: ${n.d(r+1)}</span>`:''}</div></div></div>
+   <div style="margin-top:4px">${mx?'<span class="pill">Mastered</span>':btn('buyM',`🎖️ ${fmt(c)} AP`,{data:{tree,key:key||'',id:n.id},cls:'gold sm',dis:pool<c})}</div></div>`}
+P.mastery=()=>{const s=S(),d=G.d;const dc=dailyCap();const cd=D.CLASSES[s.cls];const mp=UI.mProf||UI.profSel||'mining';
+  const deeds=(s.deeds.list||[]).map(dd=>`<div class="card ${dd.done?'sel':''}"><b>${dd.done?'✅':'📜'} ${deedText(dd)}</b><div class="small">${fmt(Math.min(dd.prog,dd.n))}/${fmt(dd.n)} · reward +${30+5*Math.min(7,s.daily.streak||1)} general AP & gold</div>${bar(dd.prog/dd.n,'xpfill')}</div>`).join('');
+  const sig=Object.assign({id:'sig',i:cd.i,base:15,mult:1.25,max:20},cd.apNode);
+  return `<h2>🎖️ Mastery</h2>
+  <p class="small">Every action earns <b>Action Points</b>: kills fill your <b>class</b> pool, profession actions fill that <b>profession's</b> pool, and everything trickles into the <b>general</b> pool. Masteries are <b>permanent</b> — they survive Ascension — and each rank costs more than the last. AP bonus: <b>+${fmt(d.apPct||0)}%</b>${d.profApPct?` · profession AP +${fmt(d.profApPct)}%`:''}. Offline efficiency: <b>${Math.round(offlineRate()*100)}%</b>.</p>
+  <div class="grid" style="--min:230px"><div class="card"><h3 style="margin-top:0">📅 Daily</h3><div class="small">Streak <b>${s.daily.streak||0}</b> day${s.daily.streak===1?'':'s'} 🔥 · first <b>${dc}</b> actions each day earn <b>double AP</b>: ${fmt(Math.min(dc,s.daily.count||0))}/${dc} used</div>${bar(Math.min(1,(s.daily.count||0)/dc),'kfill')}<div class="small muted">New day = +${10*Math.min(7,(s.daily.streak||0)+1)} general AP (grows with streak, max 70) and 3 new deeds.</div></div>
+  <div class="card"><h3 style="margin-top:0">🎖️ Balances</h3><div class="small">General: <b>${fmt(Math.floor(s.ap.gen))}</b><br>${cd.i} ${cd.n}: <b>${fmt(Math.floor(s.ap.cls[s.cls]||0))}</b><br>${D.PROF_ORDER.filter(q=>(s.ap.prof[q]||0)>=1).map(q=>`${D.PROFS[q].i} ${fmt(Math.floor(s.ap.prof[q]))}`).join(' · ')||'<span class="muted">No profession AP yet</span>'}<br><span class="muted">Lifetime earned ${fmt(Math.floor(s.stats.apEarned||0))} · spent ${fmt(s.stats.apSpent||0)}</span></div></div></div>
+  <h3>📜 Today's deeds</h3><div class="grid" style="--min:220px">${deeds||'<span class="muted">Deeds arrive at the start of each day.</span>'}</div>
+  <h3>🌐 General mastery <span class="muted">— ${fmt(Math.floor(s.ap.gen))} AP</span></h3><div class="grid" style="--min:230px">${D.AP_GEN.map(n=>mNode('gen',null,n,s.mastery.gen,s.ap.gen)).join('')}</div>
+  <h3>${cd.i} ${cd.n} mastery <span class="muted">— ${fmt(Math.floor(s.ap.cls[s.cls]||0))} AP (switch class to train another tree)</span></h3><div class="grid" style="--min:230px">${mNode('cls',s.cls,sig,s.mastery.cls[s.cls],s.ap.cls[s.cls]||0)}${D.AP_CLASS.map(n=>mNode('cls',s.cls,n,s.mastery.cls[s.cls],s.ap.cls[s.cls]||0)).join('')}</div>
+  <h3>⚒️ Profession mastery</h3><div class="row">${D.PROF_ORDER.map(q=>btn('mProf',`${D.PROFS[q].i} ${fmt(Math.floor(s.ap.prof[q]||0))}`,{data:{p:q},cls:'sm'+(q===mp?' on':'')})).join('')}</div>
+  <h3>${D.PROFS[mp].i} ${D.PROFS[mp].n} <span class="muted">— ${fmt(Math.floor(s.ap.prof[mp]||0))} AP</span></h3><div class="grid" style="--min:230px">${D.AP_PROF.map(n=>mNode('prof',mp,n,s.mastery.prof[mp],s.ap.prof[mp]||0)).join('')}</div>`};
 P.inv=()=>{const s=S();const items=s.inv.slice().sort((a,b)=>UI.invSort==='r'?(b.r-a.r||b.il-a.il):UI.invSort==='il'?(b.il-a.il):D.SLOTS.indexOf(a.slot)-D.SLOTS.indexOf(b.slot));
   const tiles=items.map(it=>`<div class="item ${isUpgradeCached(it)?'up':''}" style="--rc:${D.RARITIES[it.r].color}" data-a="item" data-id="${it.id}"><div class="ii">${itemIcon(it)}</div><div class="small r${it.r}" style="font-size:10px">${D.RARITIES[it.r].name}</div><div class="il">${D.SLOT_NAME[it.slot]} · il ${it.il}</div>${it.ench?`<span class="en">+${it.ench}</span>`:''}${s.locked[it.id]?'<span class="lk">🔒</span>':''}</div>`).join('');
   const mats=Object.keys(D.MATS).filter(k=>(s.mats[k]||0)>0).map(k=>`<span class="pill">${D.MATS[k].i} ${D.MATS[k].n} <b>${fmt(s.mats[k])}</b></span>`).join(' ');
@@ -251,16 +314,16 @@ function itemModal(id,eq){const s=S();let it=eq?Object.values(s.equip).find(x=>x
    ${it.aff.map(a=>`<div class="r1">${affLine(a,em)}</div>`).join('')}${(it.pw||[]).map(p=>{const L=D.LEGENDARY.find(x=>x.id===p);return `<div class="r4">★ ${L.n}: ${L.d}</div>`}).join('')}</div>${cmp}
    <div class="row" style="margin-top:10px">${eq?'':btn('equip','Equip',{data:{id:it.id},cls:'green'})}${eq?'':btn('lock',s.locked[it.id]?'🔓 Unlock':'🔒 Lock',{data:{id:it.id}})}${eq?'':btn('sell',`Sell 🪙${fmt(itemValue(it))}`,{data:{id:it.id}})}${eq?'':btn('salvage',`Salvage ✨${fmt(itemDust(it))}`,{data:{id:it.id}})}<span class="sp"></span>${btn('close','Close')}</div>`)}
 P.town=()=>{const s=S();
-  const g=D.GUILD.map(x=>{const l=s.guild[x.id]||0,c=upgradeCost(x.base,x.mult,l);return `<div class="card"><div class="hd"><span class="ic">${x.i}</span><div class="sp"><b>${x.n}</b> <span class="pill">Lv ${l}</span><div class="small">${x.d(l)} → <span class="r1">${x.d(l+1)}</span></div></div></div>${btn('guild',costTxt(c),{data:{id:x.id},cls:'gold sm',dis:s.gold<c})}</div>`}).join('');
-  const q=D.QOL.map(x=>s.qol[x.id]?`<div class="card" style="opacity:.6"><b>${x.i} ${x.n}</b> ✅<div class="small">${x.d}</div></div>`:`<div class="card"><b>${x.i} ${x.n}</b><div class="small">${x.d}</div>${btn('qol',costTxt(x.cost),{data:{id:x.id},cls:'gold sm',dis:s.gold<x.cost})}</div>`).join('');
-  const sc=upgradeCost(D.SATCHEL.base,D.SATCHEL.mult,s.satchel),pc=upgradeCost(D.PLOTS.base,D.PLOTS.mult,s.plotsBought);
-  return `<h2>🏰 Town of Emberhold</h2><h3>Quality of Life</h3><div class="grid">${q}</div>
+  const g=D.GUILD.map(x=>{const l=s.guild[x.id]||0,c=townCost(upgradeCost(x.base,x.mult,l));return `<div class="card"><div class="hd"><span class="ic">${x.i}</span><div class="sp"><b>${x.n}</b> <span class="pill">Lv ${l}</span><div class="small">${x.d(l)} → <span class="r1">${x.d(l+1)}</span></div></div></div>${btn('guild',costTxt(c),{data:{id:x.id},cls:'gold sm',dis:s.gold<c})}</div>`}).join('');
+  const q=D.QOL.map(x=>s.qol[x.id]?`<div class="card" style="opacity:.6"><b>${x.i} ${x.n}</b> ✅<div class="small">${x.d}</div></div>`:`<div class="card"><b>${x.i} ${x.n}</b><div class="small">${x.d}</div>${btn('qol',costTxt(townCost(x.cost)),{data:{id:x.id},cls:'gold sm',dis:s.gold<townCost(x.cost)})}</div>`).join('');
+  const sc=townCost(upgradeCost(D.SATCHEL.base,D.SATCHEL.mult,s.satchel)),pc=townCost(upgradeCost(D.PLOTS.base,D.PLOTS.mult,s.plotsBought));const pmu=priceMult();
+  return `<h2>🏰 Town of Emberhold</h2>${pmu<1?`<p class="small">📜 Court favor: all Town prices <b class="r1">−${Math.round((1-pmu)*100)}%</b> (Advising reputation).</p>`:''}<h3>Quality of Life</h3><div class="grid">${q}</div>
   <h3>Guild Halls (repeatable)</h3><div class="grid">${g}</div>
   <h3>Outfitters</h3><div class="grid"><div class="card"><b>🎒 Bigger Satchel</b><div class="small">Inventory ${invCap()} → ${invCap()+10}</div>${s.satchel<D.SATCHEL.max?btn('satchel',costTxt(sc),{cls:'gold sm',dis:s.gold<sc}):'<span class="pill">Max</span>'}</div>
   <div class="card"><b>🌱 Garden Plot</b><div class="small">Herb plots ${plotsCount()} → ${plotsCount()+1}</div>${s.plotsBought<D.PLOTS.max?btn('plot',costTxt(pc),{cls:'gold sm',dis:s.gold<pc}):'<span class="pill">Max</span>'}</div></div>`;};
 P.codex=()=>{const s=S();const found=Object.keys(s.relics).length;
   return `<h2>🏺 Relic Codex <span class="muted">${found}/${D.RELICS.length}</span></h2>
-  <p class="small">Relics are ultra-rare, <b>account-wide and permanent</b> — they survive Ascension. Every relic, its effect, where it drops and its exact odds are listed so you know what you're hunting. Magic Find does not affect relics; <b>Relic Sense</b> (Ascension) does.</p>
+  <p class="small">Relics are ultra-rare, <b>account-wide and permanent</b> — they survive Ascension. Every relic, its effect, where it drops and its exact odds are listed so you know what you're hunting. Magic Find does not affect relics; <b>Relic Sense</b> (Ascension and Mastery), <b>Lucky Find</b> (profession Mastery) and some relics do. Profession relics roll on <b>every action</b> of that profession — success or failure.</p>
   <p class="small">💥 <b>Damage cap:</b> every single hit is capped at <b>${fmt(D.BASE_DMG_CAP)}</b>. Late zones and the Endless Rift demand more — break it with <b>Limit Breaker</b> (Ascension), the <b>Shard of the Limitless</b> (×100) or the <b>Crown of the Unbound</b> (no cap). Current cap: <b>${G.d.cap===Infinity?'∞':fmt(G.d.cap)}</b>.</p>
   <div class="grid" style="--min:250px">${D.RELICS.map(r=>{const f=s.relics[r.id],o=relicOdds(r),src=r.src.prof?`${D.PROFS[r.src.prof].i} Any ${D.PROFS[r.src.prof].n} action`:`${D.ZONES[r.src.zone].i} ${D.ZONES[r.src.zone].n} — ${r.src.boss?'boss kill':r.src.elite?'elite or boss kill':'any kill'}`;
    return `<div class="card relicCard ${f?'found':''}"><div class="hd"><span class="ic">${r.i}</span><div><b class="${f?'relic':''}">${r.n}</b><div class="small">${f?'✅ Found '+new Date(f.t).toLocaleDateString()+` after ${fmt(f.tries)} tries`:'Not yet found'}</div></div></div>
@@ -274,10 +337,10 @@ P.ascend=()=>{const s=S(),g=shardPreview(),can=canAscend();
 P.ach=()=>{const s=S();const n=Object.keys(s.ach).length;return `<h2>🏆 Feats <span class="muted">${n}/${D.ACH.length}</span></h2><p class="muted">Each feat permanently grants +1% damage and +1% gold.</p><div class="grid" style="--min:200px">${D.ACH.map(a=>`<div class="card ${s.ach[a.id]?'sel':'locked'}"><b>${s.ach[a.id]?'🏆':'🔒'} ${a.n}</b><div class="small">${a.d}</div></div>`).join('')}</div>`};
 P.log=()=>{const s=S();const cats=['all','loot','level','boss','prof','relic','ach','death'];const L=s.log.filter(l=>UI.logFilter==='all'||l.c===UI.logFilter);
   return `<h2>📜 Chronicle</h2><div class="row">${cats.map(c=>btn('logf',c,{data:{c},cls:'sm'+(UI.logFilter===c?' on':'')})).join('')}</div><div style="margin-top:8px">${L.map(l=>`<div class="logl ${l.c}"><time>${new Date(l.t).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</time>${l.m}</div>`).join('')||'<span class="muted">Nothing yet.</span>'}</div>`};
-P.settings=()=>{const s=S(),st=s.settings;const sp=speedOptions();
+P.settings=()=>{const s=S(),st=s.settings;
   const filt=s.qol.filter?`<h3>🧾 Loot Filter</h3><table>${D.RARITIES.map((r,i)=>`<tr><td class="r${i}">${r.name}</td><td>${['keep','sell','salvage'].map(a=>btn('filter',a,{data:{r:i,v:a},cls:'sm'+(st.filter[i]===a?' on':'')})).join(' ')}</td></tr>`).join('')}</table>`:`<p class="muted">Buy the Loot Filter in Town for per-rarity Keep/Sell/Salvage rules.</p>`;
   return `<h2>⚙️ Settings</h2>
-  <h3>Game speed</h3><div class="row">${sp.map(x=>btn('setSpeed',x+'×',{data:{v:x},cls:'sm'+(st.speed===x?' on':'')})).join('')}${s.relics.clock?'<span class="pill">🕰️ Everclock ×1.5</span>':''}</div>
+  <p class="small muted">The world runs in real time. Speed comes only from permanent upgrades (Mastery, relics, Haste) — there is no fast-forward.</p>
   <h3>Combat</h3><div class="small">Auto-potion below <b>${st.quaffAt}%</b> HP ${s.qol.autoQuaff?'':'(needs Potion Belt)'}</div><input type="range" min="10" max="90" step="5" value="${st.quaffAt}" data-in="quaffAt">
   <div class="row">${s.qol.autoEquip?toggle('autoEquip','🎽 Auto-equip'):''}${s.qol.autoEat?toggle('autoEat','🍽️ Auto-eat'):''}${s.qol.autoElixir?toggle('autoElixir','🧴 Auto-elixir'):''}${s.qol.autoBoss?toggle('autoBoss','🔔 Auto-boss'):''}${s.qol.autoAdvance?toggle('autoAdvance','🗺️ Auto-advance'):''}</div>
   ${filt}
@@ -287,7 +350,7 @@ P.settings=()=>{const s=S(),st=s.settings;const sp=speedOptions();
   <p class="muted" style="margin-top:14px">Realms of Ember · original fantasy setting · made for Noah.</p>`};
 
 function renderTabs(){const s=S();const pts=s.classes[s.cls].pts>0;setHTML($('#tabs'),TABS.map(([k,l])=>`<button data-a="tab" data-t="${k}" class="${UI.tab===k?'on':''}">${l}${k==='skills'&&pts?'<span class="dot"></span>':''}</button>`).join(''))}
-function renderPanel(force){const pn=$('#panel');if(!force&&(UI.busyInput||pn.contains(document.activeElement)&&document.activeElement.tagName==='INPUT'))return;
+function renderPanel(force){const pn=$('#panel');if(!force&&(UI.busyInput||pn.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName)))return;
   const st=pn.scrollTop;if(force)pn._h=null;const h=P[UI.tab]();if(force||(!UI.ptrDown&&pn._h!==h)){pn._h=h;pn.innerHTML=h}pn.scrollTop=st;UI.lastPanel=performance.now();renderTabs()}
 
 /* ---------------- actions ---------------- */
@@ -305,6 +368,11 @@ const A={
   setAlch:e=>{S().ps.alchemy.recipe=e.id},setCook:e=>{S().ps.cooking.recipe=e.id},setEnch:e=>{S().ps.enchanting.slot=e.sl},
   toggleWard:()=>{const es=S().ps.enchanting;es.ward=!es.ward},
   tool:e=>buyTool(e.p),
+  setSum:e=>{S().ps.summoning.target=e.id},setDance:e=>{const ds=S().ps.dancing;if(ds.target!==e.id){ds.target=e.id;ds.combo=0}},setDeity:e=>{S().ps.praying.target=e.id;G.dirty=true},
+  setPet:e=>{S().ps.advising.target=e.id},setSong:e=>{S().ps.bard.target=e.id},setAnthem:e=>{S().ps.bard.anthem=e.id;G.dirty=true},setFish:e=>{S().ps.fishing.target=e.id},
+  releaseSum:e=>{const s=S();if(confirm('Release this creature?')){s.summons=s.summons.filter(x=>x.uid!=e.uid);G.dirty=true}},
+  buyM:e=>{if(!buyMastery(e.tree,e.key||null,e.id))toast('Not enough AP')},
+  mProf:e=>{UI.mProf=e.p},goMastery:e=>{UI.mProf=e.p;UI.tab='mastery';$('#panel').scrollTop=0},
   skillUp:e=>spendPoint(e.id),
   toggleSkill:e=>{const cl=S().classes[S().cls];cl.off[e.id]=!cl.off[e.id]},
   respec:()=>{if(confirm('Refund all skill points for this class?'))respec()},
@@ -316,7 +384,7 @@ const A={
   sell:e=>{const it=S().inv.find(x=>x.id==e.id);if(it)sellItem(it);closeModal()},
   salvage:e=>{const it=S().inv.find(x=>x.id==e.id);if(it)salvageItem(it);closeModal()},
   lock:e=>{const s=S();if(s.locked[e.id])delete s.locked[e.id];else s.locked[e.id]=1;itemModal(e.id,false)},
-  close:()=>closeModal(),
+  close:()=>closeModal(),showOff:()=>{const r=UI.pendingOff;UI.pendingOff=null;if(r)showOffline(r);else closeModal()},
   sort:e=>{UI.invSort=e.k},
   bulk:e=>{const s=S();let n=0,g=0;for(const it of s.inv.slice())if(it.r<=+e.r&&!s.locked[it.id]){g+=e.m==='sell'?sellItem(it):salvageItem(it);n++}toast(`${e.m==='sell'?'Sold':'Salvaged'} ${n} items for ${e.m==='sell'?'🪙':'✨'}${fmt(g)}`)},
   equipBest:()=>{const s=S();let n=0;for(const sl of D.SLOTS){let best=null;for(const it of s.inv)if(it.slot===sl&&isUpgrade(it)&&(!best||powerWith(sl,it)>powerWith(sl,best)))best=it;if(best){equipItem(best);n++}}toast(n?`Equipped ${n} upgrade${n>1?'s':''}`:'Already wearing your best gear')},
@@ -326,8 +394,6 @@ const A={
   logf:e=>{UI.logFilter=e.c},
   toggleSet:e=>{const st=S().settings;st[e.k]=!st[e.k]},
   filter:e=>{S().settings.filter[+e.r]=e.v},
-  setSpeed:e=>{S().settings.speed=+e.v},
-  speed:()=>{const o=speedOptions(),st=S().settings;st.speed=o[(o.indexOf(st.speed)+1)%o.length];if(o.length===1)toast('Unlock faster speeds with Runes of Haste in Town.')},
   saveNow:()=>{save();toast('💾 Saved')},
   export:()=>{const code=exportSave();modal(`<h2>📤 Export save</h2><textarea rows="6" readonly onclick="this.select()">${code}</textarea><div class="row" style="margin-top:8px">${btn('copySave','📋 Copy')}<span class="sp"></span>${btn('close','Close')}</div>`)},
   copySave:()=>{const t=document.querySelector('#modal textarea');t.select();(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).then(()=>toast('Copied'),()=>{document.execCommand('copy');toast('Copied')})},
@@ -338,7 +404,7 @@ const A={
 };
 document.addEventListener('click',ev=>{const el=ev.target.closest('[data-a]');if(!el)return;if(el.classList.contains('dis'))return;const f=A[el.dataset.a];if(f){f(el.dataset);renderTop();renderSlots();if(!$('#modal').contains(el)||el.dataset.a!=='lock')renderPanel(true)}});
 document.addEventListener('input',ev=>{const k=ev.target.dataset&&ev.target.dataset.in;if(!k)return;const v=+ev.target.value;if(k==='smithTarget')S().ps.smithing.target=v;if(k==='quaffAt')S().settings.quaffAt=v;UI.busyInput=true});
-document.addEventListener('change',ev=>{if(ev.target.dataset&&ev.target.dataset.in){UI.busyInput=false;renderPanel(true)}});
+document.addEventListener('change',ev=>{if(ev.target.dataset&&ev.target.dataset.sel==='sumRole'){const su=S().summons.find(x=>x.uid==ev.target.dataset.uid);if(su){su.role=ev.target.value;G.dirty=true}renderPanel(true);return}if(ev.target.dataset&&ev.target.dataset.in){UI.busyInput=false;renderPanel(true)}});
 document.addEventListener('pointerup',()=>{if(UI.busyInput)setTimeout(()=>{UI.busyInput=false},50)});
 $('#modal').addEventListener('click',ev=>{if(ev.target.id==='modal'&&S().started)closeModal()});
 
@@ -363,9 +429,22 @@ function showOffline(r){const b=r.before,a=r.after;const lines=[];
   D.PROF_ORDER.forEach((p,i)=>{if(a.profs[i]>b.profs[i])lines.push(`${D.PROFS[p].i} ${D.PROFS[p].n} ${b.profs[i]} → <b>${a.profs[i]}</b>`)});
   const items=a.found.map((n,i)=>n-b.found[i]);if(items.some(x=>x))lines.push(`🎒 Items found: ${items.map((n,i)=>n?`<span class="r${i}">${n} ${D.RARITIES[i].name}</span>`:'').filter(Boolean).join(', ')}`);
   const mats=Object.keys(a.mats).filter(k=>(a.mats[k]||0)>(b.mats[k]||0)&&D.MATS[k]).map(k=>`${D.MATS[k].i}+${fmt(a.mats[k]-(b.mats[k]||0))}`);if(mats.length)lines.push(`📦 ${mats.join(' ')}`);
+  if(a.ap>b.ap)lines.push(`🎖️ +${fmt(Math.floor(a.ap-b.ap))} Action Points earned`);
   if(a.relics>b.relics)lines.push(`<b class="relic">🏺 You discovered a RELIC while away!</b>`);
   modal(`<h2>🌙 While you were away (${fmtTime(Math.min(r.el,offlineCap()))}${r.el>offlineCap()?' — capped':''})</h2><p class="small muted">Offline you progress at <b>${Math.round((r.rate||offlineRate())*100)}%</b> of your online rate (raise it with 🌙 Night Watch in Mastery). Offline cap: ${fmtTime(offlineCap())}.</p>${lines.map(l=>`<div style="margin:4px 0">${l}</div>`).join('')}<div class="row" style="margin-top:10px"><span class="sp"></span>${btn('close','Onward!',{cls:'gold'})}</div>`)}
 
+function showMigration(m,off){const rs=(m.rescaled||[]).map(x=>`${x.i} ${x.n} ${x.from} → <b>${x.to}</b>`).join(' · ');
+  modal(`<h2>🔥 Realms of Ember has been reforged (v2)</h2>
+  <p class="small">Your gear, gold, relics, unlocked classes, Town upgrades and ascension progress are safe. What changed:</p>
+  <ul class="small"><li><b>A real grind now.</b> No game-speed multiplier. Every level takes at least 10 minutes from level 1, and much longer later.</li>
+  <li><b>Offline is slow.</b> Away time earns only ${Math.round(offlineRate()*100)}% of your online rate (raise it with 🌙 Night Watch), capped at ${fmtTime(offlineCap())}.</li>
+  <li><b>Action Points & Mastery.</b> Every kill and profession action earns AP for permanent upgrades (new 🎖️ Mastery tab). Daily double-AP actions, streaks and deeds.</li>
+  <li><b>Six new professions:</b> 🔯 Summoning, 💃 Dancing, 🙏 Praying, 📜 Advising, 🎻 Bard, 🎣 Fishing, plus 12 profession relics.</li>
+  <li><b>Three new classes:</b> 🤴 General (commands troops), 👷 Worker (profession specialist, available now), 🕵️ Collector (loot and relic hunter, fragile).</li>
+  <li>Professions can now <b>fail</b> and attacks can <b>miss</b>. Levels and Mastery improve the odds.</li></ul>
+  <p class="small"><b>⚖️ Levels rescaled.</b> Your levels were earned on the old, much faster curve, so they were converted to the new curve by equivalent play time: ${rs||'no changes needed'}. Skill points were refunded to match your new class levels.</p>
+  <p class="small"><b>Converted for you:</b> old speed runes became 🐕 Hunting Hounds and 📒 Steward's Ledger, and the old astral speed upgrade became 🌀 Astral Haste. <b>Head-start AP</b> for your past play: 🎖️ ${fmt(m.gen)} general, ${fmt(m.cl)} class, ${fmt(m.pr)} profession AP.</p>
+  <div class="row"><span class="sp"></span>${btn(off?'showOff':'close','Onward!',{cls:'gold'})}</div>`);UI.pendingOff=off}
 /* ---------------- boot ---------------- */
 function boot(){
   let loaded=false;try{const raw=localStorage.getItem(SAVE_KEY);if(raw){loadFrom(raw);loaded=true}}catch(e){console.warn('Save load failed',e)}
@@ -374,7 +453,8 @@ function boot(){
   fxResize();window.addEventListener('resize',fxResize);
   renderTabs();renderPanel(true);renderTop();
   if(!S().started)showIntro();
-  else{const el=(Date.now()-S().last)/1000;if(el>60){const r=catchUp(el);if(r)showOffline(r)}}
+  else{const el=(Date.now()-S().last)/1000;let r=null;if(el>60)r=catchUp(el);
+    if(G.migration){const m=G.migration;G.migration=null;save();showMigration(m,r)}else if(r)showOffline(r)}
   document.addEventListener('visibilitychange',()=>{if(document.hidden)save();else lastT=performance.now()-(Date.now()-S().last)})
   window.addEventListener('pagehide',save);
   requestAnimationFrame(t=>{lastT=t;frame(t)});

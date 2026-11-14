@@ -616,3 +616,15 @@ D.DEEDS=[
   {t:'actions',n:250,d:n=>`Perform ${n} actions of any kind`},{t:'prof',n:60,d:(n,p)=>`Perform ${n} successful ${D.PROFS[p].n} actions`},
 ];
 D.DAILY_CAP=300;
+
+/* ---- v2 feats ---- */
+D.ACH.push(
+  ...['summoning','dancing','praying','advising','bard','fishing'].flatMap(p=>[25,50].map(l=>({id:p+l,n:{summoning:'Binder',dancing:'Lord of the Dance',praying:'Devout',advising:'Trusted Counsel',bard:'Minstrel',fishing:'Angler'}[p]+(l===50?' Supreme':''),d:`Reach ${D.PROFS[p].n} level ${l}`,t:s=>s.profs[p].lvl>=l}))),
+  {id:'ap1k',n:'Disciplined',d:'Earn 1,000 Action Points',t:s=>(s.stats.apEarned||0)>=1e3},
+  {id:'ap25k',n:'Master of Many Arts',d:'Earn 25,000 Action Points',t:s=>(s.stats.apEarned||0)>=25e3},
+  {id:'streak7',n:'Creature of Habit',d:'Reach a 7-day daily streak',t:s=>(s.daily.streak||0)>=7},
+  {id:'deeds25',n:'Dutiful',d:'Complete 25 daily deeds',t:s=>(s.stats.deedsDone||0)>=25},
+  {id:'fav10',n:'Chosen One',d:'Reach blessing tier 7 with any deity',t:s=>Object.values(s.ps.praying.favor||{}).some(f=>Math.floor(Math.log2(f/10+1))>=7)},
+  {id:'rep3k',n:'Voice of the Court',d:'Reach 3,000 Reputation',t:s=>(s.ps.advising.rep||0)>=3000},
+  {id:'army',n:'Grand Army',d:'Lead 25 troops at once (General)',t:s=>(s.stats.maxTroops||0)>=25},
+);

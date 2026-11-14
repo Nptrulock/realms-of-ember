@@ -172,3 +172,16 @@ select,input[type=text],textarea{background:#0008;border:1px solid var(--line);c
 .hidden{display:none!important}
 .choose{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .choose .card{cursor:pointer;text-align:center}.choose .card .ic{font-size:44px}
+/* v2 */
+.ally.troop{font-size:22px;animation-duration:1.2s}
+.ally.summon{font-size:30px;filter:drop-shadow(0 0 8px #b57bffaa) drop-shadow(0 4px 4px #000a)}
+.troopCount{position:absolute;transform:translate(-50%,-50%);font-size:12px;background:#0009;border:1px solid #d4a01788;border-radius:10px;padding:1px 7px;z-index:5;color:#ffe08a}
+.pscene.bob{animation:pPop .35s ease-out}
+@keyframes pPop{0%{transform:scale(1)}40%{transform:scale(1.18) rotate(-4deg)}100%{transform:scale(1)}}
+.mnode .ic{font-size:26px}
+select{background:#1a1520;color:#eee;border:1px solid #4a3c55;border-radius:6px;padding:4px 6px;width:100%;margin-top:6px;font:inherit;font-size:12px}
+ul.small{padding-left:18px;margin:6px 0}ul.small li{margin:4px 0}
+.pscene.summoning,.pscene.praying{animation:glow 1.6s ease-in-out infinite}
+.pscene.dancing,.pscene.bard{animation:sway 1s ease-in-out infinite}
+.pscene.advising,.pscene.fishing{animation:bob 2.2s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg) translateY(-6px)}}
