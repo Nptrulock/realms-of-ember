@@ -54,3 +54,4 @@ const s=S();
 console.log(`${mode} ${id} — ${hours}h sim${spendAP?'':' (no AP spending)'}: reached level ${last}; current level ${(( t-lastT)/60).toFixed(0)} min in progress`);
 console.log(times.map(([l,m])=>`L${l}→${l+1}: ${m.toFixed(1)}m`).join(' | '));
 console.log(`kills ${s.stats.kills} (${(s.stats.kills/hours/60).toFixed(1)}/min) bosses ${s.stats.bosses} elites ${s.stats.elites} · `+`min level time ${Math.min(...times.map(x=>x[1])).toFixed(1)} min · AP gen ${s.ap.gen.toFixed(0)} spent ${s.stats.apSpent} · cleared zones ${s.stats.everCleared} · deaths ${s.stats.deaths}`);
+if(process.env.CUM){let c=0;const a=[0,0];for(const [l,m] of times){c+=m;a[l+1]=+(c/60).toFixed(3)}console.log('CUM '+JSON.stringify(a))}

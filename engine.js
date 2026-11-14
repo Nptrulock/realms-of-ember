@@ -578,14 +578,49 @@ function giveStarter(){const S=G.S;autoFirst(S.cls);const it=makeItem(1,0,'weapo
 /* ---------- save / load / offline ---------- */
 function serialize(){G.S.last=Date.now();return JSON.stringify(G.S)}
 function save(){try{localStorage.setItem(SAVE_KEY,serialize())}catch(e){}}
+/* v1 -> v2 save migration. Levels are converted by equivalent play time: hours a v1 player needed for a level
+   (measured with the v1 engine at 1x) mapped onto hours the v2 curve needs (measured with sim.js, AP spending on). */
+const MIG={
+ oldProf:[0,0,0.004,0.008,0.012,0.016,0.021,0.027,0.033,0.039,0.047,0.055,0.063,0.068,0.072,0.077,0.083,0.089,0.095,0.103,0.111,0.12,0.129,0.14,0.153,0.165,0.172,0.178,0.186,0.194,0.203,0.213,0.223,0.235,0.247,0.262,0.277,0.295,0.314,0.334,0.357,0.369,0.38,0.392,0.407,0.422,0.44,0.459,0.479,0.502,0.527,0.555,0.585,0.617,0.655,0.695,0.739,0.787,0.841,0.9,0.965,0.995,1.029,1.065,1.105,1.149,1.198,1.252,1.311,1.376,1.447,1.524,1.611,1.706,1.811,1.924,2.051,2.19,2.342,2.511,2.695,2.898,3.122,3.368,3.638,3.936,4.263,4.623,5.019,5.455,5.934],
+ oldCls:[[1,0],[13,.164],[18,.5],[21,1],[23,1.35],[27,1.47],[28,1.5],[35,1.75],[42,2],[47,2.27],[53,2.5],[65,3],[70,3.5],[72,4],[74,5],[75,5.12],[77,6]],
+ newProf:[0,0,0.288,0.552,0.798,1.07,1.374,1.712,2.024,2.328,2.659,3.006,3.392,3.718,4.089,4.482,4.897,5.335,5.821,6.358,6.911,7.471,8.061,8.69,9.38,10.106,10.747,11.436,12.157,12.939,13.796,14.71,15.704,16.783,17.917,19.122,20.339,21.661,23.086],
+ newCls:[0,0,0.396,0.804,1.267,1.756,2.044,2.334,2.638,3.031,3.453,3.952,4.49,4.998,5.405,5.796,6.15,6.5,6.849,7.194,7.542,7.852,8.152,8.453,8.767,9.084,9.421,9.806,10.246,10.731,11.297,11.733,12.191,12.659,13.159,13.693,14.271,14.915,15.641,16.451,17.419,18.399,19.043,19.706,20.404,21.166,21.983,22.86,23.823]};
+function migHours(kind,lvl,frac){ // v1 hours to reach (lvl + frac)
+  if(kind==='prof'){const a=MIG.oldProf,L=Math.min(lvl,a.length-1);let h=a[L];const nx=L+1<a.length?a[L+1]:h*1.09;if(L<lvl)h*=Math.pow(1.09,lvl-L);return h+(nx-a[L])*frac}
+  const a=MIG.oldCls;const x=lvl+frac;for(let i=1;i<a.length;i++)if(x<=a[i][0]){const [l0,h0]=a[i-1],[l1,h1]=a[i];return h0+(h1-h0)*(x-l0)/(l1-l0)}
+  return a[a.length-1][1]+.5*(x-a[a.length-1][0])}
+function migLevel(kind,h){ // v2 level + fraction reached after h hours
+  const a=kind==='prof'?MIG.newProf:MIG.newCls;let L=1;while(L+1<a.length&&a[L+1]<=h)L++;
+  if(L+1<a.length)return [L,(h-a[L])/(a[L+1]-a[L])];
+  let step=a[L]-a[L-1],t=a[L];while(t+step*1.07<=h){step*=1.07;t+=step;L++}return [L,(h-t)/(step*1.07)]}
 function migrate(s){if((s.v||1)>=2)return null;
   const old=s.v||1;s.v=2;s.settings.speed=1;s.unlockedCls=s.unlockedCls||{};s.unlockedCls.worker=1;
   if(s.qol){if(s.qol.speed15){delete s.qol.speed15;s.qol.hounds=1}if(s.qol.speed2){delete s.qol.speed2;s.qol.ledger=1}}
   if(s.astral&&s.astral.warp3){delete s.astral.warp3;s.astral.haste=(s.astral.haste||0)+2}
-  const kills=(s.stats&&s.stats.kills)||0;const gen=Math.round(50+kills/25);s.ap.gen+=gen;let cl=0,pr=0;
-  for(const c in s.classes){const a=Math.round(s.classes[c].lvl*s.classes[c].lvl*2);if(s.classes[c].lvl>1){s.ap.cls[c]=(s.ap.cls[c]||0)+a;cl+=a}}
-  for(const p in s.profs){const a=Math.round(s.profs[p].lvl*s.profs[p].lvl*2);if(s.profs[p].lvl>1){s.ap.prof[p]=(s.ap.prof[p]||0)+a;pr+=a}}
-  return {from:old,gen,cl,pr}}
+  const oldCN=L=>Math.floor(12*Math.pow(1.13,L)*(1+L*0.1)),oldPN=L=>Math.floor(30*Math.pow(1.1,L));
+  const rescaled=[];let cl=0,pr=0;
+  for(const c in s.classes){const st=s.classes[c];if(st.lvl<=1&&!st.xp)continue;const h=migHours('cls',st.lvl,Math.min(1,(st.xp||0)/oldCN(st.lvl)));
+    let [L,f]=migLevel('cls',h);if(L>st.lvl){L=st.lvl;f=0}const from=st.lvl;st.lvl=L;st.xp=Math.floor(f*xpNeed(L));
+    if(L<from){st.ranks={};st.pts=L;if(L<D.SUB_LEVEL)st.sub=null;if(D.CLASSES[c])rescaled.push({i:D.CLASSES[c].i,n:D.CLASSES[c].n,from,to:L})}
+    const a=Math.round(h*1500);if(a){s.ap.cls[c]=(s.ap.cls[c]||0)+a;cl+=a}}
+  for(const p in s.profs){const st=s.profs[p];if(st.lvl<=1&&!st.xp)continue;const h=migHours('prof',st.lvl,Math.min(1,(st.xp||0)/oldPN(st.lvl)));
+    let [L,f]=migLevel('prof',h);if(L>st.lvl){L=st.lvl;f=0}const from=st.lvl;st.lvl=L;st.xp=Math.floor(f*profXpNeed(L));
+    if(L<from&&D.PROFS[p])rescaled.push({i:D.PROFS[p].i,n:D.PROFS[p].n,from,to:L});
+    const a=Math.round(h*400);if(a){s.ap.prof[p]=(s.ap.prof[p]||0)+a;pr+=a}}
+  // keep profession targets valid for the new levels
+  const best=(arr,lv)=>{let b=arr[0].id;for(const x of arr)if(x.lv<=lv)b=x.id;return b};
+  const ok=(arr,id,lv)=>{const x=arr.find(y=>y.id===id);return x&&x.lv<=lv};
+  const P=s.profs,ps=s.ps;
+  if(!ok(D.PROFS.mining.nodes,ps.mining.node,P.mining.lvl)){ps.mining.node=best(D.PROFS.mining.nodes,P.mining.lvl);ps.mining.streak=0}
+  if(!ok(D.PROFS.herbalism.seeds,ps.herbalism.seed,P.herbalism.lvl))ps.herbalism.seed=best(D.PROFS.herbalism.seeds,P.herbalism.lvl);
+  if(!ok(D.PROFS.smithing.tiers,ps.smithing.tier,P.smithing.lvl))ps.smithing.tier=best(D.PROFS.smithing.tiers,P.smithing.lvl);
+  if(!ok(D.PROFS.alchemy.recipes,ps.alchemy.recipe,P.alchemy.lvl))ps.alchemy.recipe=best(D.PROFS.alchemy.recipes,P.alchemy.lvl);
+  if(!ok(D.PROFS.cooking.recipes,ps.cooking.recipe,P.cooking.lvl))ps.cooking.recipe=best(D.PROFS.cooking.recipes,P.cooking.lvl);
+  // send the hero somewhere survivable for the new level
+  const lv=(s.classes[s.cls]||{lvl:1}).lvl;let z=0;D.ZONES.forEach((zd,i)=>{if(s.zones[i]&&s.zones[i].unlocked&&zd.min<=lv+2)z=i});if((s.zone||0)>z)s.zone=z;
+  if(s.cls2&&(s.classes[s.cls2]||{lvl:1}).lvl<D.MULTI_LEVEL&&!Object.values(s.classes).some(c=>c.lvl>=D.MULTI_LEVEL))s.cls2=null;
+  const kills=(s.stats&&s.stats.kills)||0;const gen=Math.round(50+Math.min(2000,kills/25));s.ap.gen+=gen;
+  return {from:old,gen,cl,pr,rescaled}}
 function loadFrom(json){const s=JSON.parse(json);deepFill(s,newState());G.migration=migrate(s);G.S=s;syncSlots();G.dirty=true;recalc();newHero();return s}
 function exportSave(){return btoa(unescape(encodeURIComponent(serialize())))}
 function importSave(str){const json=decodeURIComponent(escape(atob(str.trim())));loadFrom(json);save()}
