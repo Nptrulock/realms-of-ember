@@ -282,7 +282,7 @@ P.settings=()=>{const s=S(),st=s.settings;const sp=speedOptions();
   <div class="row">${s.qol.autoEquip?toggle('autoEquip','🎽 Auto-equip'):''}${s.qol.autoEat?toggle('autoEat','🍽️ Auto-eat'):''}${s.qol.autoElixir?toggle('autoElixir','🧴 Auto-elixir'):''}${s.qol.autoBoss?toggle('autoBoss','🔔 Auto-boss'):''}${s.qol.autoAdvance?toggle('autoAdvance','🗺️ Auto-advance'):''}</div>
   ${filt}
   <h3>Visuals</h3><div class="row">${toggle('particles','✨ Particles')}${toggle('numbers','🔢 Damage numbers')}${toggle('shake','📳 Screen shake')}</div>
-  <h3>Save</h3><p class="muted">Autosaves every 10s to this browser. Offline progress cap: ${fmtTime(offlineCap())}.</p>
+  <h3>Save</h3><p class="muted">Autosaves every 10s to this browser. Offline progress: ${Math.round(offlineRate()*100)}% of online rate, capped at ${fmtTime(offlineCap())}.</p>
   <div class="row">${btn('saveNow','💾 Save now')}${btn('export','📤 Export')}${btn('import','📥 Import')}${btn('rename','✏️ Rename hero')}<span class="sp"></span>${btn('hardReset','🗑️ Hard reset',{cls:'red'})}</div>
   <p class="muted" style="margin-top:14px">Realms of Ember · original fantasy setting · made for Noah.</p>`};
 
@@ -357,14 +357,14 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
-function catchUp(sec){const before=snapshot();simulate(Math.min(sec,offlineCap())*gameSpeed(),sec>600?1:.25);return sec>60?{el:sec,before,after:snapshot()}:null}
+function catchUp(sec){const before=snapshot();const rate=sec>60?offlineRate():1;simulate(Math.min(sec,offlineCap())*rate,sec>600?1:.25);return sec>60?{el:sec,before,after:snapshot(),rate}:null}
 function showOffline(r){const b=r.before,a=r.after;const lines=[];
   lines.push(`🪙 Gold: <b>+${fmt(Math.max(0,a.gold-b.gold))}</b>`);lines.push(`⚔️ Monsters slain: <b>${fmt(a.kills-b.kills)}</b>`);if(a.lv>b.lv)lines.push(`⬆️ Class level ${b.lv} → <b>${a.lv}</b>`);
   D.PROF_ORDER.forEach((p,i)=>{if(a.profs[i]>b.profs[i])lines.push(`${D.PROFS[p].i} ${D.PROFS[p].n} ${b.profs[i]} → <b>${a.profs[i]}</b>`)});
   const items=a.found.map((n,i)=>n-b.found[i]);if(items.some(x=>x))lines.push(`🎒 Items found: ${items.map((n,i)=>n?`<span class="r${i}">${n} ${D.RARITIES[i].name}</span>`:'').filter(Boolean).join(', ')}`);
   const mats=Object.keys(a.mats).filter(k=>(a.mats[k]||0)>(b.mats[k]||0)&&D.MATS[k]).map(k=>`${D.MATS[k].i}+${fmt(a.mats[k]-(b.mats[k]||0))}`);if(mats.length)lines.push(`📦 ${mats.join(' ')}`);
   if(a.relics>b.relics)lines.push(`<b class="relic">🏺 You discovered a RELIC while away!</b>`);
-  modal(`<h2>🌙 While you were away (${fmtTime(Math.min(r.el,offlineCap()))}${r.el>offlineCap()?' — capped':''})</h2>${lines.map(l=>`<div style="margin:4px 0">${l}</div>`).join('')}<div class="row" style="margin-top:10px"><span class="sp"></span>${btn('close','Onward!',{cls:'gold'})}</div>`)}
+  modal(`<h2>🌙 While you were away (${fmtTime(Math.min(r.el,offlineCap()))}${r.el>offlineCap()?' — capped':''})</h2><p class="small muted">Offline you progress at <b>${Math.round((r.rate||offlineRate())*100)}%</b> of your online rate (raise it with 🌙 Night Watch in Mastery). Offline cap: ${fmtTime(offlineCap())}.</p>${lines.map(l=>`<div style="margin:4px 0">${l}</div>`).join('')}<div class="row" style="margin-top:10px"><span class="sp"></span>${btn('close','Onward!',{cls:'gold'})}</div>`)}
 
 /* ---------------- boot ---------------- */
 function boot(){

@@ -263,10 +263,13 @@ D.CLASSES = {
 D.CLASS_ORDER = ['fighter','wizard','rogue','cleric','ranger','paladin','warlock'];
 D.CLASS_UNLOCK = {
   fighter:{d:'Available from the start'}, wizard:{d:'Available from the start'}, rogue:{d:'Available from the start'},
-  cleric:{d:'Reach 15 total class levels',test:s=>totalClassLevels(s)>=15},
-  ranger:{d:'Defeat the Goblin King',test:s=>s.zones[1].cleared},
-  paladin:{d:'Defeat The Hollow Priest',test:s=>s.zones[2].cleared},
-  warlock:{d:'Defeat the Crystalback Basilisk',test:s=>s.zones[3].cleared},
+  cleric:{d:'Reach 10 total class levels',test:s=>totalClassLevels(s)>=10},
+  ranger:{d:'Defeat Old Grizzlemaw',test:s=>s.zones[0].cleared||s.stats.everCleared>0},
+  paladin:{d:'Defeat The Hollow Priest',test:s=>s.zones[2].cleared||s.stats.everCleared>2},
+  warlock:{d:'Defeat the Crystalback Basilisk',test:s=>s.zones[3].cleared||s.stats.everCleared>3},
+  general:{d:'Defeat the Goblin King',test:s=>s.zones[1].cleared||s.stats.everCleared>1},
+  worker:{d:'Available from the start'},
+  collector:{d:'Find an Epic item',test:s=>s.stats.found[3]>0||s.stats.found[4]>0},
 };
 D.SUB_LEVEL = 20; D.MULTI_LEVEL = 20;
 function pc(x){return Math.round(x*100)+'%'}
@@ -275,9 +278,9 @@ function totalClassLevels(s){let t=0;for(const k in s.classes)t+=s.classes[k].lv
 /* ---------------- PROFESSIONS ---------------- */
 D.PROFS = {
   mining:{n:'Mining',i:'⛏️',kind:'gather',mech:'Pick a vein. Consecutive swings build a <b>Lode Streak</b> (up to +100% yield). Rare chance to unearth gems. Switching veins resets the streak.',
-    nodes:[{id:'copper',lv:1,t:3,xp:8,gem:'amethyst'},{id:'iron',lv:12,t:3.5,xp:22,gem:'ruby'},{id:'mithril',lv:25,t:4,xp:60,gem:'sapphire'},{id:'adamant',lv:40,t:4.5,xp:160,gem:'emerald'},{id:'starmetal',lv:60,t:5,xp:420,gem:'diamond'}]},
+    nodes:[{id:'copper',lv:1,t:6,xp:8,gem:'amethyst'},{id:'iron',lv:12,t:7,xp:22,gem:'ruby'},{id:'mithril',lv:25,t:8,xp:60,gem:'sapphire'},{id:'adamant',lv:40,t:9,xp:160,gem:'emerald'},{id:'starmetal',lv:60,t:10,xp:420,gem:'diamond'}]},
   herbalism:{n:'Herbalism',i:'🌿',kind:'gather',mech:'Tend a <b>garden of plots</b>. Plants grow in real time (twice as fast while tended) and occasionally <b>mutate golden</b> for 5× harvest. Plots keep growing while you do other things.',
-    seeds:[{id:'silverleaf',lv:1,t:30,xp:10},{id:'bloodthistle',lv:10,t:50,xp:30},{id:'moonpetal',lv:22,t:80,xp:80},{id:'emberroot',lv:35,t:120,xp:200},{id:'starbloom',lv:50,t:180,xp:520}]},
+    seeds:[{id:'silverleaf',lv:1,t:90,xp:16},{id:'bloodthistle',lv:12,t:150,xp:48},{id:'moonpetal',lv:25,t:240,xp:130},{id:'emberroot',lv:40,t:360,xp:340},{id:'starbloom',lv:60,t:540,xp:900}]},
   smithing:{n:'Smithing',i:'⚒️',kind:'craft',mech:'Forge gear from ore and monster materials. <b>Heat builds</b> while you work; set your <b>strike temperature</b>. Hotter strikes roll far better rarity but risk <b>cracking</b> the piece.',
     tiers:[{id:'copper',n:'Copper',lv:1,il:6,ore:'copper',mat:'pelt',xp:15},{id:'iron',n:'Iron',lv:12,il:18,ore:'iron',mat:'scrap',xp:40},{id:'mithril',n:'Mithril',lv:25,il:32,ore:'mithril',mat:'crystal',xp:100},{id:'adamant',n:'Adamantine',lv:40,il:50,ore:'adamant',mat:'frost',xp:260},{id:'starmetal',n:'Starmetal',lv:60,il:70,ore:'starmetal',mat:'ember',xp:650},{id:'dragon',n:'Dragonforged',lv:75,il:88,ore:'starmetal',mat:'scale',xp:1500}]},
   alchemy:{n:'Alchemy',i:'⚗️',kind:'craft',mech:'Brew healing potions and powerful elixirs. Each recipe has its own <b>Mastery</b> (0–100) that raises potency and double-brew chance. 4% chance of a <b>volatile reaction</b> that yields a bonus random elixir.',
@@ -314,14 +317,14 @@ D.RELICS = [
   {id:'prism',n:'Prism of Fortune',i:'🔺',src:{zone:3},odds:25000,d:'+150% Magic Find and Legendary/Mythic drop weights ×3.',mods:{mf:150,legendW:3}},
   {id:'mirror',n:"Apprentice's Mirror",i:'🪞',src:{prof:'herbalism'},odds:12000,d:'Dual skill gain: every profession action also gives 50% XP to your lowest-level other profession.',mods:{shareProf:50}},
   {id:'pick',n:'The Golden Pick',i:'⛏️',src:{prof:'mining'},odds:15000,d:'Double yield for Mining and Herbalism.',mods:{gatherMult:2}},
-  {id:'hourglass',n:'Hourglass of Ages',i:'⌛',src:{zone:4,elite:1},odds:4000,d:'+1 extra action slot (a tireless Familiar working at 100% speed).',mods:{extraSlot:1}},
+  {id:'hourglass',n:'Hourglass of Ages',i:'⌛',src:{zone:4,elite:1},odds:4000,d:'+1 extra action slot (a tireless Familiar working at 100% speed) and +10% offline efficiency.',mods:{extraSlot:1}},
   {id:'philo',n:"Philosopher's Stone",i:'🪨',src:{prof:'alchemy'},odds:10000,d:'Smithing, Alchemy and Cooking produce double output.',mods:{craftMult:2}},
   {id:'shard',n:'Shard of the Limitless',i:'💠',src:{zone:5,boss:1},odds:150,d:'LIMIT BREAK I: damage cap ×100 (99,999 → 9,999,900).',mods:{capMult:100}},
   {id:'sigil',n:'Sigil of Echoes',i:'🔁',src:{zone:6},odds:30000,d:'Every skill has a 30% chance to cast twice.',mods:{echo:30}},
   {id:'heart',n:'Heart of the Wyrm',i:'❤️‍🔥',src:{zone:7,elite:1},odds:5000,d:'+75% damage and +75% max HP, forever.',mods:{dmgPct:75,hpPct:75}},
   {id:'crown',n:'Crown of the Unbound',i:'👑',src:{zone:7,boss:1},odds:400,d:'LIMIT BREAK ∞: removes the damage cap entirely.',mods:{noCap:1}},
   {id:'ladle',n:'Everlasting Ladle',i:'🥄',src:{prof:'cooking'},odds:8000,d:'Meal buffs are doubled in strength and never expire.',mods:{mealMult:2}},
-  {id:'clock',n:'Everclock',i:'🕰️',src:{zone:8,boss:1},odds:100,d:'Permanent +50% game speed (stacks with speed runes).',mods:{speedMult:1.5}},
+  {id:'clock',n:'Everclock',i:'🕰️',src:{zone:8,boss:1},odds:100,d:'+25% speed for every action: attacks and all professions.',mods:{actSpeed:25}},
   {id:'forge',n:'Ember of the First Forge',i:'🔥',src:{prof:'smithing'},odds:6000,d:'Smithing never cracks, and every forged item gains +1 rarity tier.',mods:{noCrack:1,forgeUp:1}},
 ];
 
@@ -338,13 +341,13 @@ D.QOL = [
   {id:'autoHarvest',n:'Scarecrow',i:'🎃',cost:10000,d:'Garden plots are harvested and replanted automatically even when no one is tending them.'},
   {id:'sellsword',n:'Hire Sellsword',i:'🗡️',cost:15000,d:'A sellsword joins your party and fights alongside you.'},
   {id:'autoEat',n:'Mess Hall',i:'🍽️',cost:15000,d:'Automatically eat your best meal when no meal buff is active.'},
-  {id:'speed15',n:'Rune of Haste',i:'⏩',cost:25000,d:'Unlocks 1.5× game speed.'},
+  {id:'hounds',n:'Hunting Hounds',i:'🐕',cost:25000,d:'Monsters are found 30% faster between fights.'},
   {id:'autoElixir',n:'Elixir Rack',i:'🧴',cost:40000,d:'Automatically drink elixirs to keep their buffs up.'},
-  {id:'hourglass1',n:'Traveler\'s Hourglass',i:'⏳',cost:50000,d:'Offline progress cap 2h → 8h.'},
+  {id:'hourglass1',n:'Traveler\'s Hourglass',i:'⏳',cost:50000,d:'Offline progress cap 2h → 6h.'},
   {id:'apprentice2',n:'Hire Journeyman',i:'👷',cost:120000,d:'+1 more action slot (75% speed).'},
   {id:'acolyte',n:'Hire Acolyte',i:'🧑‍⚕️',cost:150000,d:'A healer joins your party, mending you during battle.'},
-  {id:'speed2',n:'Greater Rune of Haste',i:'⏭️',cost:400000,d:'Unlocks 2× game speed.'},
-  {id:'hourglass2',n:'Sands of Eternity',i:'⌛',cost:2e6,d:'Offline progress cap 8h → 24h.'},
+  {id:'ledger',n:"Steward's Ledger",i:'📒',cost:400000,d:'+15% Action Points from all sources.'},
+  {id:'hourglass2',n:'Sands of Eternity',i:'⌛',cost:2e6,d:'Offline progress cap 6h → 12h.'},
   {id:'apprentice3',n:'Hire Master Artisan',i:'🧑‍🏭',cost:5e6,d:'+1 more action slot (75% speed).'},
 ];
 D.SATCHEL = {base:2000,mult:3,max:6,add:10};
@@ -373,7 +376,7 @@ D.ASTRAL = [
   {id:'headstart',n:'Head Start',i:'🚩',base:3,mult:2.2,max:5,d:l=>`Start each run with the first ${l} zone(s) cleared + ${fmtPlain(1000*Math.pow(10,l))} gold`},
   {id:'limit',n:'Limit Breaker',i:'💥',base:5,mult:2,max:10,d:l=>`Damage cap +${100*l}%`,ap:(d,l)=>d.capMult*=1+l},
   {id:'relicLuck',n:'Relic Sense',i:'🧭',base:8,mult:2,max:5,d:l=>`Relic drop odds +${25*l}% (shown in the Codex)`},
-  {id:'warp3',n:'Time Warp',i:'🌀',base:10,mult:1,max:1,d:l=>`Unlocks 3× game speed`},
+  {id:'haste',n:'Astral Haste',i:'🌀',base:6,mult:1.8,max:10,d:l=>`+${5*l}% speed for all actions`,ap:(d,l)=>{d.actSpeed+=5*l}},
   {id:'mythic',n:'Mythic Attunement',i:'🔴',base:15,mult:1,max:1,d:l=>`Mythic items can drop`},
   {id:'familiar',n:'Astral Familiar',i:'🦉',base:25,mult:1,max:1,d:l=>`+1 action slot (100% speed)`},
 ];
@@ -413,4 +416,203 @@ D.ACH = [
   {id:'dual',n:'Multiclassed',d:'Choose a secondary class',t:s=>!!s.cls2},
 ];
 function maxClassLevel(s){let m=0;for(const k in s.classes)m=Math.max(m,s.classes[k].lvl);return m}
-if(typeof module!=='undefined')module.exports={D};
+
+
+/* =====================================================================
+   v2 — new classes, professions, relics, Action Point masteries
+   ===================================================================== */
+Object.assign(D.CLASSES,{
+ general:{n:'General',i:'🤴',w:'🚩',wn:['Command Sabre','Marshal\'s Baton','War Standard'],color:'#d4a017',main:'cha',atk:1.8,autoMult:.8,crit:5,
+  growth:{str:1.1,dex:.5,con:1.3,int:.8,wis:.6,cha:1.8},
+  res:{n:'Command',color:'#d4a017',max:()=>100,regen:()=>6,start:.5},
+  troops:true,
+  mech:'Leads a company of <b>Troops</b> that fight every 2 seconds as one. <b>Muster</b> recruits more; troops can fall when you are struck. <b>Command</b> fuels orders: volleys, charges and shield walls.',
+  skills:[
+   {id:'muster',n:'Muster',i:'📯',lv:1,max:5,cd:6,cost:30,cond:C=>C.h.troops<C.d.troopMax,d:r=>`Recruit ${1+r} troops (max set by Logistics & level).`,cast:(C,r)=>{C.h.troops=Math.min(C.d.troopMax,C.h.troops+1+r)}},
+   {id:'volley',n:'Volley Order',i:'🏹',lv:3,max:5,cd:5,cost:25,cond:C=>C.h.troops>=3,d:r=>`Every troop looses arrows: all enemies take ${pc(.1+.02*(r-1))} per troop.`,cast:(C,r)=>C.aoe((.1+.02*(r-1))*C.h.troops*(1+C.d.troopDmg/100),{icon:'🏹',proj:'➶'})},
+   {id:'wall',n:'Shield Wall',i:'🛡️',lv:8,max:5,cd:20,cost:35,d:r=>`Troops brace: +${20+5*(r-1)}% damage reduction for 8s.`,cast:(C,r)=>C.buff('wall',8,{dr:20+5*(r-1)},'🛡️')},
+   {id:'charge',n:'Cavalry Charge',i:'🐎',lv:15,max:5,cd:10,cost:40,cond:C=>C.h.troops>=5,d:r=>`Ride down the target for ${pc(.3+.06*(r-1))} per troop.`,cast:(C,r)=>C.hit(C.tgt(),(.3+.06*(r-1))*C.h.troops*(1+C.d.troopDmg/100),{icon:'🐎',big:1})},
+   {id:'rally',n:'Rally the Line',i:'🎺',lv:25,max:5,cd:30,cost:50,d:r=>`Heal ${15+3*(r-1)}% HP and recruit 5 troops.`,cast:(C,r)=>{C.healPct((15+3*(r-1))/100);C.h.troops=Math.min(C.d.troopMax,C.h.troops+5)}},
+  ],
+  passives:[
+   {id:'drill',n:'Drillmaster',i:'🥁',lv:1,max:10,d:r=>`+${10*r}% troop damage`,ap:(d,r)=>d.troopDmg+=10*r},
+   {id:'logist',n:'Logistics',i:'📦',lv:1,max:10,d:r=>`+${2*r} max troops`,ap:(d,r)=>d.troopMax+=2*r},
+   {id:'vets',n:'Veterans',i:'🎖️',lv:5,max:10,d:r=>`Troops are ${5*r}% less likely to fall`,ap:(d,r)=>d.troopSafe+=5*r},
+   {id:'presence',n:'Inspiring Presence',i:'✨',lv:10,max:10,d:r=>`+${r}% damage per 5 troops`,ap:(d,r)=>d.presence+=r},
+   {id:'quarter',n:'Quartermaster',i:'🧾',lv:20,max:10,d:r=>`+${10*r}% Command regeneration`,ap:(d,r)=>d.resRegen+=10*r},
+   {id:'banner',n:'War Banners',i:'🚩',lv:30,max:10,d:r=>`+${6*r}% max HP`,ap:(d,r)=>d.hpPct+=6*r},
+  ],
+  subs:[{id:'marshal',n:'Warmarshal',i:'⚔️',d:'Troop damage +100%, +5 max troops',ap:d=>{d.troopDmg+=100;d.troopMax+=5}},
+        {id:'castellan',n:'Castellan',i:'🏰',d:'Troops 50% less likely to fall, +20% max HP',ap:d=>{d.troopSafe+=50;d.hpPct+=20}}],
+  apNode:{n:'Recruiting Office',d:r=>`+${r} max troops`,ap:(d,r)=>d.troopMax+=r}},
+ worker:{n:'Worker',i:'👷',w:'🔧',wn:['Shovel','Sledge','Wrench'],color:'#e8963a',main:'con',atk:1.9,autoMult:.6,crit:4,
+  growth:{str:1,dex:.6,con:1.5,int:.5,wis:.7,cha:.4},
+  res:{n:'Stamina',color:'#e8963a',max:()=>100,regen:()=>4,start:1},
+  inherent:d=>{d.profApPct+=200;d.profSpeed+=20;d.profXp+=20},
+  mech:'No combat specialty — a weak fighter. But while a Worker is your active class, every profession earns <b>3× Action Points</b> and works 20% faster with +20% profession XP.',
+  skills:[
+   {id:'swing',n:'Shovel Swing',i:'🪏',lv:1,max:5,cd:3,cost:20,d:r=>`Whack for ${pc(1.3+.2*(r-1))}.`,cast:(C,r)=>C.hit(C.tgt(),1.3+.2*(r-1),{icon:'🪏'})},
+   {id:'toss',n:'Toolbox Toss',i:'🧰',lv:3,max:5,cd:6,cost:35,d:r=>`Hit all enemies for ${pc(.8+.15*(r-1))}.`,cast:(C,r)=>C.aoe(.8+.15*(r-1),{icon:'🧰',proj:'🔧'})},
+   {id:'grit',n:'Grit',i:'😤',lv:8,max:5,cd:20,cost:30,cond:C=>C.hpPct()<.6,d:r=>`Below 60% HP heal ${15+4*(r-1)}%.`,cast:(C,r)=>C.healPct((15+4*(r-1))/100)},
+   {id:'overtime',n:'Overtime',i:'⏱️',lv:15,max:5,cd:25,cost:40,d:r=>`+${20+5*(r-1)}% damage and haste for 10s.`,cast:(C,r)=>C.buff('ot',10,{dmgPct:20+5*(r-1),haste:20+5*(r-1)},'⏱️')},
+   {id:'demolish',n:'Demolish',i:'🏗️',lv:25,max:5,cd:14,cost:60,d:r=>`Bring the house down: ${pc(3.5+.5*(r-1))} to the target.`,cast:(C,r)=>C.hit(C.tgt(),3.5+.5*(r-1),{icon:'🏗️',big:1})},
+  ],
+  passives:[
+   {id:'callous',n:'Calloused Hands',i:'✋',lv:1,max:10,d:r=>`+${6*r}% max HP`,ap:(d,r)=>d.hpPct+=6*r},
+   {id:'effic',n:'Efficiency',i:'⚙️',lv:1,max:10,d:r=>`+${4*r}% profession speed`,ap:(d,r)=>d.profSpeed+=4*r},
+   {id:'union',n:'Union Card',i:'🪪',lv:5,max:10,d:r=>`+${10*r}% profession AP`,ap:(d,r)=>d.profApPct+=10*r},
+   {id:'tinker',n:'Tinkerer',i:'🔩',lv:10,max:10,d:r=>`+${r}% profession success chance`,ap:(d,r)=>d.profSucc+=r},
+   {id:'mule',n:'Pack Mule',i:'🫏',lv:20,max:10,d:r=>`+${3*r}% chance of bonus yield`,ap:(d,r)=>d.bounty+=3*r},
+   {id:'sturdy',n:'Sturdy Frame',i:'🧱',lv:30,max:10,d:r=>`${2*r}% damage reduction`,ap:(d,r)=>d.dr+=2*r},
+  ],
+  subs:[{id:'foreman',n:'Foreman',i:'📋',d:'Your helpers work 25% faster',ap:d=>{d.helperEff+=25}},
+        {id:'artisan',n:'Artisan',i:'🛠️',d:'+8% profession success, +50% profession AP',ap:d=>{d.profSucc+=8;d.profApPct+=50}}],
+  apNode:{n:'Guild Dues',d:r=>`+${3*r}% profession AP (all classes' Worker pool)`,ap:(d,r)=>d.profApPct+=3*r}},
+ collector:{n:'Collector',i:'🕵️',w:'💰',wn:['Cane','Jeweled Dirk','Collector\'s Whip'],color:'#2ec4b6',main:'dex',atk:1.4,crit:8,
+  growth:{str:.5,dex:1.6,con:.6,int:.9,wis:.5,cha:1.2},
+  res:{n:'Greed',color:'#2ec4b6',max:()=>100,regen:()=>5,start:0,onAtk:5},
+  inherent:d=>{d.hpPct-=40;d.armorPct-=40;d.gold+=60;d.mf+=60;d.relicLuck+=25;d.dropPct+=30},
+  mech:'Fragile (−40% HP and armor) but greedy: <b>+60% gold, +60% magic find, +30% item drops and +25% relic odds</b>. Attacks build <b>Greed</b>.',
+  skills:[
+   {id:'snatch',n:'Snatch',i:'🫳',lv:1,max:5,cd:3,cost:25,d:r=>`Hit for ${pc(1.4+.2*(r-1))} and pocket some coin.`,cast:(C,r)=>{const t=C.tgt();if(t){C.hit(t,1.4+.2*(r-1),{icon:'🫳'});C.steal(t,.3+.1*(r-1))}}},
+   {id:'appraise',n:'Appraise',i:'🧐',lv:3,max:5,cd:15,cost:30,d:r=>`+${30+10*(r-1)}% magic find for 15s.`,cast:(C,r)=>C.buff('appr',15,{mf:30+10*(r-1)},'🧐')},
+   {id:'sand',n:'Pocket Sand',i:'🫧',lv:8,max:5,cd:18,cost:30,d:r=>`+${35+5*(r-1)}% dodge for 6s.`,cast:(C,r)=>C.buff('sand',6,{dodge:35+5*(r-1)},'🫧')},
+   {id:'tsense',n:'Treasure Sense',i:'🗝️',lv:15,max:5,cd:20,cost:40,cond:C=>C.tgt()&&!C.tgt().loot,d:r=>`Mark a foe: it is guaranteed to drop an item (+${r*10}% magic find on it).`,cast:(C,r)=>{const t=C.tgt();t.loot=r}},
+   {id:'coins',n:'Coin Storm',i:'🪙',lv:25,max:5,cd:14,cost:60,d:r=>`Hurl gold at all enemies for ${pc(2.5+.4*(r-1))}.`,cast:(C,r)=>C.aoe(2.5+.4*(r-1),{icon:'🪙',proj:'🪙'})},
+  ],
+  passives:[
+   {id:'keen',n:'Keen Eye',i:'👁️',lv:1,max:10,d:r=>`+${8*r}% magic find`,ap:(d,r)=>d.mf+=8*r},
+   {id:'pockets',n:'Deep Pockets',i:'👝',lv:1,max:10,d:r=>`+${8*r}% gold`,ap:(d,r)=>d.gold+=8*r},
+   {id:'rhunt',n:'Relic Hunter',i:'🏺',lv:5,max:10,d:r=>`+${4*r}% relic odds`,ap:(d,r)=>d.relicLuck+=4*r},
+   {id:'charm',n:'Lucky Charm',i:'🍀',lv:10,max:10,d:r=>`+${1.5*r}% crit chance`,ap:(d,r)=>d.crit+=1.5*r},
+   {id:'hoard',n:'Hoarder',i:'📦',lv:20,max:10,d:r=>`+${5*r}% item drop chance`,ap:(d,r)=>d.dropPct+=5*r},
+   {id:'escape',n:'Escape Artist',i:'💨',lv:30,max:10,d:r=>`+${2*r}% dodge`,ap:(d,r)=>d.dodge+=2*r},
+  ],
+  subs:[{id:'thunter',n:'Treasure Hunter',i:'🗺️',d:'+50% relic odds',ap:d=>{d.relicLuck+=50}},
+        {id:'fence',n:'Fence',i:'🤝',d:'Items sell for double, +50% gold',ap:d=>{d.sellMult*=2;d.gold+=50}}],
+  apNode:{n:'Black Market Contacts',d:r=>`+${3*r}% gold and magic find`,ap:(d,r)=>{d.gold+=3*r;d.mf+=3*r}}},
+});
+D.CLASS_ORDER.push('general','worker','collector');
+// signature AP nodes for the original classes
+Object.assign(D.CLASSES.fighter,{apNode:{n:'Berserker Blood',d:r=>`+${3*r}% Rage generation, +${r}% crit`,ap:(d,r)=>{d.resGen+=3*r;d.crit+=r}}});
+Object.assign(D.CLASSES.wizard,{apNode:{n:'Arcane Study',d:r=>`+${3*r}% spell damage, slots recharge ${2*r}% faster`,ap:(d,r)=>{d.spellDmg+=3*r;d.slotRate+=2*r}}});
+Object.assign(D.CLASSES.rogue,{apNode:{n:'Shadow Training',d:r=>`+${5*r}% sneak attack damage, +${r}% dodge`,ap:(d,r)=>{d.sneak+=5*r;d.dodge+=r}}});
+Object.assign(D.CLASSES.cleric,{apNode:{n:'Litany',d:r=>`+${3*r}% healing and Faith generation`,ap:(d,r)=>{d.healPct+=3*r;d.resGen+=3*r}}});
+Object.assign(D.CLASSES.ranger,{apNode:{n:'Pack Leader',d:r=>`+${5*r}% pet damage`,ap:(d,r)=>d.petDmg+=5*r}});
+Object.assign(D.CLASSES.paladin,{apNode:{n:'Oathkeeper',d:r=>`+${2*r}% armor, +${r}% damage reduction`,ap:(d,r)=>{d.armorPct+=2*r;d.dr+=r}}});
+Object.assign(D.CLASSES.warlock,{apNode:{n:'Eldritch Pact',d:r=>`+${3*r}% Eldritch Blast damage`,ap:(d,r)=>{d.ebMult*=1+.03*r}}});
+
+/* ---- new professions ---- */
+D.SUMMONS=[
+  {id:'wisp',n:'Will-o\'-Wisp',i:'🫧',lv:1,t:16,xp:8,power:1,in:{}},
+  {id:'skel',n:'Bone Servant',i:'💀',lv:10,t:19,xp:22,power:2.2,in:{bone:3}},
+  {id:'wolf',n:'Dire Wolf',i:'🐺',lv:20,t:22,xp:45,power:4,in:{pelt:5,meat:3}},
+  {id:'golem',n:'Crystal Golem',i:'🗿',lv:32,t:25,xp:100,power:7,in:{crystal:5}},
+  {id:'wraith',n:'Frost Wraith',i:'👻',lv:45,t:28,xp:220,power:11,in:{frost:5}},
+  {id:'drake',n:'Ember Drake',i:'🦎',lv:58,t:31,xp:480,power:16,in:{ember:5}},
+  {id:'horror',n:'Void Horror',i:'🦑',lv:70,t:34,xp:900,power:23,in:{ichor:5}},
+  {id:'wyrm',n:'Wyrmling',i:'🐲',lv:85,t:38,xp:2000,power:32,in:{scale:5}},
+];
+D.DANCES=[
+  {id:'jig',n:'Tavern Jig',i:'🕺',lv:1,t:5,xp:5,buff:{haste:12},bd:'+12% attack speed'},
+  {id:'sword',n:'Sword Dance',i:'🗡️',lv:15,t:6,xp:18,buff:{dmgPct:20},bd:'+20% damage'},
+  {id:'veil',n:'Dance of Veils',i:'🧣',lv:30,t:7,xp:50,buff:{dodge:8,hpPct:10},bd:'+8% dodge, +10% HP'},
+  {id:'waltz',n:'Ember Waltz',i:'💃',lv:45,t:8,xp:130,buff:{gold:40,mf:20},bd:'+40% gold, +20% magic find'},
+  {id:'star',n:'Starfall Ballet',i:'🩰',lv:60,t:9,xp:330,buff:{xp:25,profXp:25,profSpeed:10},bd:'+25% XP, +25% profession XP, +10% profession speed'},
+];
+D.DEITIES=[
+  {id:'solara',n:'Solara, the Dawnmother',i:'☀️',lv:1,t:8,xp:7,per:{regenPct:.15,vsUndead:6},bd:t=>`+${(.15*t).toFixed(2)}% HP regen/s, +${6*t}% vs undead`},
+  {id:'mordrin',n:'Mordrin of the Anvil',i:'⚒️',lv:12,t:9,xp:22,per:{profSucc:1.2,armorPct:4},bd:t=>`+${(1.2*t).toFixed(1)}% profession success, +${4*t}% armor`},
+  {id:'vela',n:'Vela, Lady of Coin',i:'🪙',lv:25,t:10,xp:60,per:{gold:8,mf:6,relicLuck:2},bd:t=>`+${8*t}% gold, +${6*t}% magic find, +${2*t}% relic odds`},
+  {id:'thalor',n:'Thalor the Red Banner',i:'🗡️',lv:40,t:11,xp:160,per:{dmgPct:6,crit:1},bd:t=>`+${6*t}% damage, +${t}% crit`},
+  {id:'nyx',n:'Nyx, Keeper of Secrets',i:'🌙',lv:55,t:12,xp:400,per:{xp:6,profXp:6,apPct:2},bd:t=>`+${6*t}% XP & profession XP, +${2*t}% AP`},
+];
+D.PETITIONERS=[
+  {id:'elder',n:'Village Elder',i:'👴',lv:1,t:8,xp:8,gold:4,rep:1},
+  {id:'guild',n:'Guildmaster',i:'🧑‍💼',lv:12,t:9,xp:22,gold:40,rep:2},
+  {id:'baron',n:'Baroness Ilsevar',i:'👸',lv:25,t:10,xp:60,gold:400,rep:4},
+  {id:'duke',n:'Duke of the Marches',i:'🤴',lv:40,t:11,xp:160,gold:5000,rep:8},
+  {id:'king',n:'The High King',i:'👑',lv:60,t:12,xp:420,gold:80000,rep:16},
+];
+D.REP_PERKS=[
+  {at:50,d:'Town prices −5%'},{at:250,d:'+10% gold from all sources'},{at:1000,d:'Town prices −10% more (−15% total)'},
+  {at:3000,d:'+10% Action Points from all sources'},{at:10000,d:'+1 action slot: a Royal Steward joins you'},
+];
+D.SONGS=[
+  {id:'valor',n:'Ballad of Valor',i:'⚔️',lv:1,t:7,xp:7,mods:{dmgPct:30},bd:'damage'},
+  {id:'mend',n:'Hymn of Mending',i:'💚',lv:10,t:8,xp:20,mods:{regenPct:1,hpPct:15},bd:'HP & regeneration'},
+  {id:'work',n:'Work Song',i:'🪕',lv:20,t:9,xp:45,mods:{profSpeed:30},bd:'profession speed'},
+  {id:'lore',n:'Lay of Lore',i:'📜',lv:35,t:10,xp:120,mods:{xp:30,profXp:30},bd:'all XP'},
+  {id:'epic',n:'Epic of the Dragonslayers',i:'🐉',lv:55,t:12,xp:380,mods:{dmgPct:50,hpPct:30,crit:5},bd:'damage, HP & crit'},
+];
+D.FISHING=[
+  {id:'pond',n:'Millpond',i:'🐟',lv:1,t:8,xp:8,fish:1},
+  {id:'river',n:'Silverrun River',i:'🐠',lv:12,t:9,xp:22,fish:2},
+  {id:'lake',n:'Moonmere Lake',i:'🐡',lv:25,t:10,xp:60,fish:3},
+  {id:'sea',n:'Frozen Sea',i:'🦈',lv:40,t:11,xp:160,fish:4},
+  {id:'trench',n:'Abyssal Trench',i:'🐙',lv:60,t:12,xp:420,fish:6},
+];
+D.MATS.fish={n:'Fresh Fish',i:'🐟'};
+Object.assign(D.PROFS,{
+  summoning:{n:'Summoning',i:'🔯',kind:'craft',mech:'Perform binding rituals to call creatures into your <b>Bestiary</b>. Each bound creature either <b>fights</b> beside you or <b>works</b> a profession (adding speed to it). Roster space grows with level; stronger creatures replace the weakest.'},
+  dancing:{n:'Dancing',i:'💃',kind:'perform',mech:'Every action is a <b>step</b>. Land 8 steps in a row to finish a <b>routine</b> and gain (or extend, up to 60 min) that dance\'s <b>Grace</b> buff. A missed step <b>breaks your combo</b>.'},
+  praying:{n:'Praying',i:'🙏',kind:'perform',mech:'Devote yourself to one <b>deity</b> at a time. Prayers build <b>Favor</b>; favor tiers (1–10) strengthen that deity\'s <b>blessing</b>. Only your current patron blesses you. Rare <b>miracles</b> grant Action Points.'},
+  advising:{n:'Advising',i:'📜',kind:'perform',mech:'Counsel petitioners from village elders to the High King. Good counsel earns <b>gold</b> and <b>Reputation</b>; bad counsel costs reputation. Reputation unlocks permanent <b>court perks</b> (discounts, AP, an extra action slot).'},
+  bard:{n:'Bard',i:'🎻',kind:'perform',mech:'Perform songs for coin and <b>Fame</b>. Each song has its own <b>mastery</b>; your chosen <b>Anthem</b> buffs you at all times, scaling with its mastery and your Bard level. Fame boosts tips and <b>encore</b> chance.'},
+  fishing:{n:'Fishing',i:'🎣',kind:'gather',mech:'Cast and wait — <b>bite time is random</b> (patience!). Fish feed new Cooking recipes, and every cast has a small chance to hook a <b>sunken treasure</b> (an item and gold).'},
+});
+D.PROF_ORDER.push('summoning','dancing','praying','advising','bard','fishing');
+D.PROFS.cooking.recipes.splice(1,0,{id:'trout',n:'Grilled Trout',i:'🐟',lv:5,in:{fish:2},xp:20,buff:{hpPct:10,regenPct:.3},sig:{hpPct:1}});
+D.PROFS.cooking.recipes.splice(4,0,{id:'chowder',n:"Seafarer's Chowder",i:'🥣',lv:30,in:{fish:3,moonpetal:1},xp:140,buff:{dmgPct:15,xp:15,profXp:10},sig:{xp:1}});
+
+/* ---- profession relics ---- */
+D.RELICS.push(
+  {id:'mountain',n:'Heart of the Mountain',i:'🏔️',src:{prof:'mining'},odds:20000,d:'+100% profession Action Points.',mods:{profApPct:100}},
+  {id:'rune',n:'Runestone of Certainty',i:'🔷',src:{prof:'enchanting'},odds:5000,d:'+25% enchant success and enchantments never lose levels.',mods:{enchSure:1}},
+  {id:'grimoire',n:'Grimoire of the Bound Legion',i:'📕',src:{prof:'summoning'},odds:8000,d:'+2 Bestiary slots and all summons are twice as powerful.',mods:{summonSlots:2,summonMult:2}},
+  {id:'slippers',n:'Slippers of the Endless Reel',i:'🩰',src:{prof:'dancing'},odds:15000,d:'+25% speed for every action (attacks and professions).',mods:{actSpeed:25}},
+  {id:'halo',n:'Halo of the Saint',i:'😇',src:{prof:'praying'},odds:12000,d:'Double Action Points from all sources.',mods:{apPct:100}},
+  {id:'seal',n:'Seal of the High Chancellor',i:'📯',src:{prof:'advising'},odds:10000,d:'+1 action slot (a tireless Chancellor) and +100% gold.',mods:{extraSlot2:1,gold:100}},
+  {id:'lute',n:'Lute of a Thousand Tales',i:'🪕',src:{prof:'bard'},odds:10000,d:'Your Anthem is twice as strong, and a second song you know plays at half strength.',mods:{anthemMult:2}},
+  {id:'hook',n:"Leviathan's Hook",i:'🪝',src:{prof:'fishing'},odds:15000,d:'+50% odds for EVERY relic.',mods:{relicLuck:50}},
+  {id:'twin',n:'Twin-Soul Locket',i:'💞',src:{prof:'summoning'},odds:25000,d:'Dual training: your two lowest professions gain 25% of ALL profession XP you earn.',mods:{dualProf:25}},
+  {id:'quill',n:'Quill of the First Scribe',i:'🪶',src:{prof:'advising'},odds:20000,d:'+1 bonus skill point every 5 levels in every class.',mods:{quill:1}},
+  {id:'sunstone',n:'Sunstone Rosary',i:'📿',src:{prof:'praying'},odds:25000,d:'+15% success chance for every profession.',mods:{profSucc:15}},
+  {id:'apron',n:'Apron of Plenty',i:'🧑‍🍳',src:{prof:'cooking'},odds:15000,d:'+50% chance of bonus yield on every profession action.',mods:{bounty:50}},
+);
+
+/* ---- Action Point masteries (permanent; survive Ascension) ---- */
+D.AP_GEN=[
+  {id:'swift',n:'Swift Hands',i:'🤲',base:15,mult:1.3,max:25,d:r=>`+${2*r}% speed for all actions`,ap:(d,r)=>d.actSpeed+=2*r},
+  {id:'mind',n:'Keen Mind',i:'🧠',base:15,mult:1.3,max:30,d:r=>`+${3*r}% class & profession XP`,ap:(d,r)=>{d.xp+=3*r;d.profXp+=3*r}},
+  {id:'fortune',n:"Fortune's Favor",i:'🍀',base:20,mult:1.3,max:30,d:r=>`+${3*r}% gold & magic find`,ap:(d,r)=>{d.gold+=3*r;d.mf+=3*r}},
+  {id:'relic',n:'Relic Sense',i:'🧭',base:40,mult:1.35,max:30,d:r=>`+${3*r}% odds for every relic`,ap:(d,r)=>d.relicLuck+=3*r},
+  {id:'tracker',n:'Tracker',i:'🐾',base:20,mult:1.4,max:10,d:r=>`Monsters found ${6*r}% faster`,ap:(d,r)=>d.search+=6*r},
+  {id:'zeal',n:'Daily Zeal',i:'📅',base:25,mult:1.4,max:10,d:r=>`+${50*r} daily bonus (×2 AP) actions`,ap:(d,r)=>d.dailyCap+=50*r},
+  {id:'endure',n:'Endurance',i:'❤️',base:15,mult:1.3,max:25,d:r=>`+${3*r}% max HP`,ap:(d,r)=>d.hpPct+=3*r},
+  {id:'disc',n:'Discipline',i:'🎯',base:30,mult:1.35,max:25,d:r=>`+${3*r}% Action Points from all sources`,ap:(d,r)=>d.apPct+=3*r},
+  {id:'vigil',n:'Night Watch',i:'🌙',base:25,mult:1.3,max:20,d:r=>`Offline efficiency ${20+2*r}% (base 20%)`,ap:()=>{}},
+  {id:'helpers',n:'Good Help',i:'🧑‍🔧',base:30,mult:1.35,max:20,d:r=>`Helpers work ${2*r}% faster`,ap:(d,r)=>d.helperEff+=2*r},
+];
+D.AP_CLASS=[
+  {id:'tempo',n:'Battle Tempo',i:'⏩',base:10,mult:1.22,max:30,d:r=>`+${1.5*r}% attack speed`,ap:(d,r)=>d.haste+=1.5*r},
+  {id:'prec',n:'Precision',i:'🎯',base:10,mult:1.25,max:25,d:r=>`+${r}% hit chance`,ap:(d,r)=>d.hit+=r},
+  {id:'brutal',n:'Brutality',i:'💥',base:10,mult:1.2,max:40,d:r=>`+${3*r}% damage`,ap:(d,r)=>d.dmgPct+=3*r},
+  {id:'hardy',n:'Hardiness',i:'🛡️',base:10,mult:1.2,max:40,d:r=>`+${3*r}% max HP`,ap:(d,r)=>d.hpPct+=3*r},
+  {id:'study',n:'Studious',i:'📖',base:12,mult:1.22,max:30,d:r=>`+${4*r}% class XP`,ap:(d,r)=>d.xp+=4*r},
+  {id:'scav',n:'Scavenger',i:'🦴',base:12,mult:1.22,max:30,d:r=>`+${3*r}% item drops & gold`,ap:(d,r)=>{d.dropPct+=3*r;d.gold+=3*r}},
+  {id:'flow',n:'Resource Flow',i:'🌊',base:12,mult:1.25,max:20,d:r=>`+${3*r}% resource regeneration`,ap:(d,r)=>d.resRegen+=3*r},
+];
+D.AP_PROF=[
+  {id:'eff',n:'Efficiency',i:'⚡',base:10,mult:1.2,max:40,d:r=>`+${3*r}% action speed`},
+  {id:'steady',n:'Steady Hands',i:'✋',base:10,mult:1.22,max:30,d:r=>`+${1.5*r}% success chance`},
+  {id:'bounty',n:'Bounty',i:'🧺',base:12,mult:1.22,max:40,d:r=>`+${3*r}% chance of bonus yield`},
+  {id:'insight',n:'Insight',i:'💡',base:10,mult:1.2,max:30,d:r=>`+${4*r}% XP`},
+  {id:'lucky',n:'Lucky Find',i:'🏺',base:25,mult:1.3,max:20,d:r=>`+${6*r}% odds for this profession's relics`},
+  {id:'mentor',n:'Mentor',i:'🧑‍🏫',base:15,mult:1.25,max:10,d:r=>`Helpers work ${5*r}% faster at this`},
+];
+D.DEEDS=[
+  {t:'kills',n:120,d:n=>`Defeat ${n} monsters`},{t:'elites',n:4,d:n=>`Defeat ${n} elites`},
+  {t:'actions',n:250,d:n=>`Perform ${n} actions of any kind`},{t:'prof',n:60,d:(n,p)=>`Perform ${n} successful ${D.PROFS[p].n} actions`},
+];
+D.DAILY_CAP=300;

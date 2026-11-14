@@ -20,18 +20,20 @@ function fmtTime(sec){sec=Math.max(0,Math.floor(sec));const h=Math.floor(sec/360
 /* ---------- state ---------- */
 function newClassState(){return {lvl:1,xp:0,pts:1,ranks:{},sub:null,off:{}}}
 function newState(){
-  const s={v:1,started:false,name:'Hero',created:Date.now(),last:Date.now(),
-    cls:'fighter',cls2:null,classes:{},unlockedCls:{fighter:1,wizard:1,rogue:1},
+  const s={v:2,started:false,name:'Hero',created:Date.now(),last:Date.now(),
+    cls:'fighter',cls2:null,classes:{},unlockedCls:{fighter:1,wizard:1,rogue:1,worker:1},
     gold:0,shards:0,ascensions:0,
     inv:[],nextId:1,equip:{},locked:{},
     mats:{},potions:{},elixirs:{},food:{},foodP:{},
-    profs:{},ps:{mining:{node:'copper',streak:0},herbalism:{seed:'silverleaf',plots:[]},smithing:{tier:'copper',slot:'weapon',target:65},alchemy:{recipe:'pot1',mastery:{}},enchanting:{slot:'weapon',ward:true},cooking:{recipe:'haunch',count:{}}},
+    profs:{},ps:{mining:{node:'copper',streak:0},herbalism:{seed:'silverleaf',plots:[]},smithing:{tier:'copper',slot:'weapon',target:65},alchemy:{recipe:'pot1',mastery:{}},enchanting:{slot:'weapon',ward:true},cooking:{recipe:'haunch',count:{}},
+      summoning:{target:'wisp'},dancing:{target:'jig',combo:0},praying:{target:'solara',favor:{}},advising:{target:'elder',rep:0},bard:{target:'valor',anthem:'valor',mastery:{},fame:0},fishing:{target:'pond'}},
+    summons:[],dance:null,ap:{gen:0,cls:{},prof:{}},mastery:{gen:{},cls:{},prof:{}},daily:{date:'',count:0,streak:0,last:''},deeds:{date:'',list:[]},
     slots:[{act:{type:'combat'},prog:0,heat:0}],
     zone:0,zones:D.ZONES.map((z,i)=>({unlocked:i===0,kills:0,cleared:false,bossKills:0})),riftLevel:0,bossReq:false,bossRetry:0,
     qol:{},plotsBought:0,satchel:0,guild:{},tools:{},astral:{},relics:{},relicTries:{},
     ach:{},settings:{speed:1,quaffAt:40,particles:true,numbers:true,autoBoss:true,autoAdvance:true,autoEquip:true,autoEat:true,autoElixir:true,filter:['sell','keep','keep','keep','keep','keep'],shake:true},
     meal:null,elix:{},
-    stats:{kills:0,elites:0,bosses:0,deaths:0,gold:0,found:[0,0,0,0,0,0],maxEnch:0,crafted:0,play:0,everCleared:0,profMax:{}},
+    stats:{kills:0,elites:0,bosses:0,deaths:0,gold:0,actions:0,apEarned:0,apSpent:0,deedsDone:0,found:[0,0,0,0,0,0],maxEnch:0,crafted:0,play:0,everCleared:0,profMax:{}},
     log:[]};
   for(const c of D.CLASS_ORDER)s.classes[c]=newClassState();
   for(const p of D.PROF_ORDER){s.profs[p]={lvl:1,xp:0};s.stats.profMax[p]=1}
@@ -43,23 +45,30 @@ function log(msg,cat='info'){const S=G.S;S.log.unshift({t:Date.now(),m:msg,c:cat
 function emit(e){if(G.fx){G.ev.push(e);if(G.ev.length>300)G.ev.splice(0,100)}}
 
 /* ---------- curves ---------- */
-const xpNeed=L=>Math.floor(12*Math.pow(1.13,L)*(1+L*0.1));
-const profXpNeed=L=>Math.floor(30*Math.pow(1.1,L));
+const xpNeed=L=>Math.floor(monXp(L+2)*132*Math.pow(1.05,L)*(1+L/4)*(1+1.2*Math.exp(-Math.pow((L-10)/7,2))));
+const profXpNeed=L=>Math.floor(950*Math.pow(1.1,L-1)*(1+L/40));
+const actXp=(req,t)=>t/6*8*Math.pow(1.035,Math.max(0,req-1));
 const monHp=m=>14*Math.pow(1.135,m)*(1+m/10);
 const monAtk=m=>2.4*Math.pow(1.115,m)*(1+m/25);
 const monXp=m=>4*Math.pow(1.1,m);
 const monGold=m=>2*Math.pow(1.1,m);
 const relicMod=k=>{let v=0;for(const r of D.RELICS)if(G.S.relics[r.id]&&r.mods[k])v+=r.mods[k];return v};
-function relicOdds(r){return Math.max(1,Math.round(r.odds/(1+0.25*(G.S.astral.relicLuck||0))))}
+function relicOdds(r){const S=G.S,d=G.d||{relicLuck:0};let b=1+0.25*(S.astral.relicLuck||0)+(d.relicLuck||0)/100;if(r.src.prof)b+=pm(r.src.prof,'lucky')*.06;return Math.max(1,Math.round(r.odds/b))}
+function pm(p,id){const m=G.S.mastery.prof[p];return m&&m[id]||0}
+function priceMult(){const rep=G.S.ps.advising.rep||0;return 1-(rep>=50?.05:0)-(rep>=1000?.10:0)}
+function townCost(c){return Math.ceil(c*priceMult())}
 function actionSlotsInfo(){const S=G.S;const a=[{n:'Hero',eff:1,hero:1}];
   ['apprentice1','apprentice2','apprentice3'].forEach((q,i)=>{if(S.qol[q])a.push({n:['Apprentice','Journeyman','Master Artisan'][i],eff:.75})});
   if(S.astral.familiar)a.push({n:'Astral Familiar',eff:1});
   if(S.relics.hourglass)a.push({n:'Hourglass Familiar',eff:1});
+  if(S.relics.seal)a.push({n:'Chancellor',eff:1});
+  if((S.ps.advising.rep||0)>=10000)a.push({n:'Royal Steward',eff:1});
   return a;}
 function syncSlots(){const n=actionSlotsInfo().length;const S=G.S;while(S.slots.length<n)S.slots.push({act:null,prog:0,heat:0});if(S.slots.length>n)S.slots.length=n}
-function speedOptions(){const S=G.S,o=[1];if(S.qol.speed15)o.push(1.5);if(S.qol.speed2)o.push(2);if(S.astral.warp3)o.push(3);return o}
-function gameSpeed(){return (G.S.settings.speed||1)*(G.S.relics.clock?1.5:1)}
-function offlineCap(){const S=G.S;return S.qol.hourglass2?86400:S.qol.hourglass1?28800:7200}
+function speedOptions(){return [1]}
+function gameSpeed(){return 1}
+function offlineCap(){const S=G.S;return S.qol.hourglass2?43200:S.qol.hourglass1?21600:7200}
+function offlineRate(){const S=G.S;return Math.min(.6,.2+.02*((S.mastery&&S.mastery.gen.vigil)||0)+(S.relics.hourglass?.1:0))}
 function plotsCount(){const S=G.S;return 3+(S.plotsBought||0)+Math.floor(S.profs.herbalism.lvl/20)}
 function invCap(){return 30+10*(G.S.satchel||0)}
 
@@ -72,7 +81,8 @@ function itemBase(it){const f=itemScale(it.il)*D.RARITIES[it.r].mult*(1+.1*(it.e
 function baseDerived(){return {str:0,dex:0,con:0,int:0,wis:0,cha:0,hpFlat:0,hpPct:0,armor:0,armorPct:0,dmgPct:0,crit:0,critDmg:50,haste:0,lifesteal:0,
   gold:0,xp:0,mf:0,regen:0,regenPct:0,resRegen:0,resGen:0,skillDmg:0,spellDmg:0,aoeDmg:0,dodge:0,petDmg:0,dr:0,healPct:0,weapon:0,
   vs:{},execute:0,riposte:0,poison:0,sneak:50,sneakCrit:0,costMult:1,slotRate:0,slotMax:2,wardMult:1,smiteMult:1,ebMult:1,soulMax:10,
-  killHeal:0,permImp:0,double:0,volley:0,petSpeed:0,hpProc:0,lowRegen:0,profSpeed:0,profXp:0,capMult:1,powers:{},echo:0}}
+  killHeal:0,permImp:0,double:0,volley:0,petSpeed:0,hpProc:0,lowRegen:0,profSpeed:0,profXp:0,capMult:1,powers:{},echo:0,
+  troopMax:5,troopDmg:0,troopSafe:0,presence:0,profApPct:0,apPct:0,profSucc:0,bounty:0,relicLuck:0,dropPct:0,sellMult:1,helperEff:0,actSpeed:0,hit:70,search:0,dailyCap:0}}
 function computeStats(opt={}){
   const S=G.S,cd=D.CLASSES[S.cls],cl=S.classes[S.cls],L=cl.lvl,d=baseDerived();
   d.crit=cd.crit;
@@ -82,6 +92,17 @@ function computeStats(opt={}){
     const em=1+.1*(it.ench||0);for(const a of it.aff)d[a.k]+=a.v*em;for(const p of (it.pw||[]))d.powers[p]=1;}
   for(const p of cd.passives){const r=cl.ranks[p.id]||0;if(r)p.ap(d,r)}
   if(cl.sub){const sb=cd.subs.find(x=>x.id===cl.sub);if(sb)sb.ap(d)}
+  if(cd.inherent)cd.inherent(d);
+  const mc=S.mastery.cls[S.cls]||{};for(const n of D.AP_CLASS){if(mc[n.id])n.ap(d,mc[n.id])}if(mc.sig&&cd.apNode)cd.apNode.ap(d,mc.sig);
+  for(const n of D.AP_GEN){const r=S.mastery.gen[n.id];if(r)n.ap(d,r)}
+  {const dv=D.DEITIES.find(x=>x.id===S.ps.praying.target);const t=favorTier(S.ps.praying.favor[dv.id]||0);if(t)for(const k in dv.per){if(k==='vsUndead')d.vs.undead=(d.vs.undead||0)+dv.per[k]*t;else d[k]+=dv.per[k]*t}}
+  {const bs=S.ps.bard,lv=S.profs.bard.lvl,am=S.relics.lute?2:1;const songs=D.SONGS.filter(x=>(bs.mastery[x.id]||0)>0);
+   const main=D.SONGS.find(x=>x.id===bs.anthem);const apply=(sg,m)=>{for(const k in sg.mods)d[k]+=sg.mods[k]*m};
+   if(main)apply(main,(bs.mastery[main.id]||0)/100*(1+lv/100)*am);
+   if(S.relics.lute){const other=songs.filter(x=>x.id!==bs.anthem).sort((a,b)=>(bs.mastery[b.id]||0)-(bs.mastery[a.id]||0))[0];if(other)apply(other,(bs.mastery[other.id]||0)/100*(1+lv/100)*.5)}}
+  if(S.dance&&S.dance.t>0){const ds=D.DANCES.find(x=>x.id===S.dance.id);const m=1+S.profs.dancing.lvl*.02;for(const k in ds.buff)d[k]+=ds.buff[k]*m}
+  {const rep=S.ps.advising.rep||0;if(rep>=250)d.gold+=10;if(rep>=3000)d.apPct+=10}
+  if(S.qol.ledger)d.apPct+=15;
   if(S.cls2&&S.cls2!==S.cls){const c2=D.CLASSES[S.cls2],cl2=S.classes[S.cls2];for(const p of c2.passives){const r=cl2.ranks[p.id]||0;if(r)p.ap(d,r*.5)}
     for(const st of D.STATS)d[st]+=c2.growth[st]*cl2.lvl*.25;}
   for(const g of D.GUILD){const l=S.guild[g.id]||0;if(l)g.ap(d,l)}
@@ -105,11 +126,12 @@ function computeStats(opt={}){
   d.armor=d.armor*(1+d.armorPct/100);
   d.crit=Math.min(80,d.crit+d.dex*.04);
   d.gold+=d.cha*.5; d.xp+=d.int*.2;
-  d.atkInt=cd.atk/(1+d.haste/100);
+  d.atkInt=cd.atk/(1+(d.haste+d.actSpeed)/100);
+  d.hit=Math.min(98,d.hit+L*.4);d.troopMax+=Math.floor(L/2);
   d.dodge=Math.min(60,d.dodge); d.dr=Math.min(75,d.dr);
   d.cap=S.relics.crown?Infinity:D.BASE_DMG_CAP*d.capMult;
   const rm=D.RARITIES;void rm;
-  d.dps=d.weaponDmg*d.mainMult*(1+d.dmgPct/100)*(1+Math.min(d.crit,80)/100*d.critDmg/100)/d.atkInt*(1+d.skillDmg/300)*(cd.autoMult||1);
+  d.dps=d.hit/100*d.weaponDmg*d.mainMult*(1+d.dmgPct/100)*(1+Math.min(d.crit,80)/100*d.critDmg/100)/d.atkInt*(1+d.skillDmg/300)*(cd.autoMult||1);
   d.ehp=d.maxHp/(1-d.dr/100)*(1+d.armor/(d.armor+12*Math.pow(1.1,L)))/(1-d.dodge/100);
   d.power=Math.sqrt(d.dps*d.ehp);
   return d;
@@ -141,7 +163,7 @@ function powerWith(slot,it){const eq=Object.assign({},G.S.equip);eq[slot]=it;ret
 function isUpgrade(it){const cur=G.S.equip[it.slot];if(!cur)return true;return powerWith(it.slot,it)>powerWith(it.slot,cur)*1.005}
 function equipItem(it,fromInv=true){const S=G.S;if(fromInv){const i=S.inv.indexOf(it);if(i>=0)S.inv.splice(i,1)}
   const old=S.equip[it.slot];S.equip[it.slot]=it;if(old){S.inv.push(old)}G.dirty=true;return old}
-function sellItem(it){const S=G.S;const i=S.inv.indexOf(it);if(i>=0)S.inv.splice(i,1);const g=itemValue(it);S.gold+=g;S.stats.gold+=g;return g}
+function sellItem(it){const S=G.S;const i=S.inv.indexOf(it);if(i>=0)S.inv.splice(i,1);const g=itemValue(it)*((G.d&&G.d.sellMult)||1);S.gold+=g;S.stats.gold+=g;return g}
 function salvageItem(it){const S=G.S;const i=S.inv.indexOf(it);if(i>=0)S.inv.splice(i,1);const n=itemDust(it);addMat('dust',n);return n}
 function addMat(k,n){const S=G.S;S.mats[k]=(S.mats[k]||0)+n}
 function gainItem(it,src){
@@ -162,7 +184,7 @@ function filterItem(it){
 /* ---------- XP ---------- */
 function addClassXp(x,cid){
   const S=G.S;cid=cid||S.cls;const c=S.classes[cid];c.xp+=x;let up=0;
-  while(c.xp>=xpNeed(c.lvl)&&c.lvl<200){c.xp-=xpNeed(c.lvl);c.lvl++;up++;c.pts++;const pl=S.astral.prodigy||0;if(pl){const every=[0,10,8,6,5,4][pl];if(c.lvl%every===0)c.pts++}}
+  while(c.xp>=xpNeed(c.lvl)&&c.lvl<200){c.xp-=xpNeed(c.lvl);c.lvl++;up++;c.pts++;if(S.relics.quill&&c.lvl%5===0)c.pts++;const pl=S.astral.prodigy||0;if(pl){const every=[0,10,8,6,5,4][pl];if(c.lvl%every===0)c.pts++}}
   if(up&&cid===S.cls){G.dirty=true;emit({t:'lvl'});log(`⬆️ ${D.CLASSES[cid].n} reached level ${c.lvl}!`,'level');checkClassUnlocks()}
 }
 function gainCombatXp(x){
@@ -171,9 +193,10 @@ function gainCombatXp(x){
   const sh=relicMod('shareXp');if(sh)for(const c of D.CLASS_ORDER)if(c!==S.cls&&c!==S.cls2&&S.unlockedCls[c])addClassXp(x*sh/100,c);
 }
 function addProfXp(p,x,share=true){
-  const S=G.S,pr=S.profs[p];const d=G.d||computeStats();x*=(1+(d.profXp||0)/100)*(1+relicMod('profXp')/100);pr.xp+=x;
+  const S=G.S,pr=S.profs[p];const d=G.d||computeStats();if(share)x*=(1+(d.profXp||0)/100+pm(p,'insight')*.04)*(1+relicMod('profXp')/100);pr.xp+=x;
   while(pr.xp>=profXpNeed(pr.lvl)&&pr.lvl<120){pr.xp-=profXpNeed(pr.lvl);pr.lvl++;log(`${D.PROFS[p].i} ${D.PROFS[p].n} reached level ${pr.lvl}`,'prof');S.stats.profMax[p]=Math.max(S.stats.profMax[p]||1,pr.lvl)}
-  const sh=relicMod('shareProf');if(share&&sh){let lo=null;for(const q of D.PROF_ORDER)if(q!==p&&(!lo||S.profs[q].lvl<S.profs[lo].lvl))lo=q;if(lo)addProfXp(lo,x*sh/100/((1+(d.profXp||0)/100)*(1+relicMod('profXp')/100)),false)}
+  const dp=relicMod('dualProf');if(share&&dp){const lows=D.PROF_ORDER.filter(q=>q!==p).sort((a,b)=>S.profs[a].lvl-S.profs[b].lvl).slice(0,2);for(const q of lows)addProfXp(q,x*dp/100,false)}
+  const sh=relicMod('shareProf');if(share&&sh){let lo=null;for(const q of D.PROF_ORDER)if(q!==p&&(!lo||S.profs[q].lvl<S.profs[lo].lvl))lo=q;if(lo)addProfXp(lo,x*sh/100,false)}
 }
 function checkClassUnlocks(){const S=G.S;for(const c of D.CLASS_ORDER){if(!S.unlockedCls[c]&&D.CLASS_UNLOCK[c].test&&D.CLASS_UNLOCK[c].test(S)){S.unlockedCls[c]=1;log(`🎭 New class unlocked: <b>${D.CLASSES[c].n}</b>!`,'level')}}}
 
@@ -189,7 +212,7 @@ function rollRelics(match){
 
 /* ---------- combat ---------- */
 function resMax(){const cd=D.CLASSES[G.S.cls];return cd.res.max(G.d)}
-function newHero(){const d=G.d;const cd=D.CLASSES[G.S.cls];G.h={hp:d.maxHp,res:cd.res.start?cd.res.max(d):0,combo:0,slots:d.slotMax,slotT:0,souls:0,shield:0,atkT:.5,gcd:0,cds:{},buffs:[],dead:false,reviveT:0,petT:1,impT:0,impMult:1,impAtk:0,swT:1.5,acoT:3,potT:0,phoenixT:0}}
+function newHero(){const d=G.d;const cd=D.CLASSES[G.S.cls];G.h={hp:d.maxHp,res:cd.res.start?cd.res.max(d):0,combo:0,slots:d.slotMax,slotT:0,souls:0,shield:0,troops:0,troopT:2,sumT:{},atkT:.5,gcd:0,cds:{},buffs:[],dead:false,reviveT:0,petT:1,impT:0,impMult:1,impAtk:0,swT:1.5,acoT:3,potT:0,phoenixT:0}}
 function zoneDef(){return D.ZONES[G.S.zone]}
 function zoneLevelRange(zi){const z=D.ZONES[zi];if(z.endless){const b=80+G.S.riftLevel*2;return [b,b+2]}return [z.min,z.max]}
 function spawnWave(boss){
@@ -215,6 +238,7 @@ const C={
   combo(n){G.h.combo=Math.min(5,G.h.combo+n)},
   gain(n){G.h.res=Math.min(resMax(),G.h.res+n)},
   petHit(e,mult){if(!e)return;petStrike(e,mult,'🐺')},
+  steal(e,f){const g=monGold(e.lvl)*f*(1+G.d.gold/100);G.S.gold+=g;G.S.stats.gold+=g;emit({t:'gold',a:g,uid:e.uid})},
 };
 function heal(a){const d=G.d;a*=1+d.healPct/100;const h=G.h;const before=h.hp;h.hp=Math.min(d.maxHp,h.hp+a);const got=h.hp-before;if(got>1)emit({t:'heal',a:got})}
 function calcHit(e,mult,o){
@@ -223,6 +247,7 @@ function calcHit(e,mult,o){
   for(const t of e.def.tags)if(d.vs[t])dmg*=1+d.vs[t]/100;
   if(e.hp/e.maxHp<.35&&d.execute)dmg*=1+d.execute/100;
   if(e.mark)dmg*=1+e.mark;
+  if(d.presence&&G.h&&G.h.troops)dmg*=1+d.presence*G.h.troops/500;
   let crit=o.forceCrit||Math.random()*100<d.crit+(o.bonusCrit||0);
   if(e.sneak&&G.S.cls==='rogue'){dmg*=1+d.sneak/100;if(d.sneakCrit)crit=true}
   if(crit)dmg*=1+d.critDmg/100;
@@ -231,6 +256,7 @@ function calcHit(e,mult,o){
   return {dmg,crit,capped};
 }
 function heroStrike(e,mult,o={}){
+  if(o.auto&&!chance(G.d.hit/100)){emit({t:'miss',uid:e.uid});return}
   const r=calcHit(e,mult,o);e.sneak=false;dealToEnemy(e,r.dmg,{crit:r.crit,capped:r.capped,icon:o.icon,color:o.color,proj:o.proj,big:o.big});
   const d=G.d;if(d.lifesteal)heal(r.dmg*d.lifesteal/100*.5);
   if(d.powers.storm&&chance(.1)&&e.hp>0){const r2=calcHit(e,1.5,{});dealToEnemy(e,r2.dmg,{crit:r2.crit,capped:r2.capped,icon:'⚡',color:'#9ff'})}
@@ -240,16 +266,17 @@ function petStrike(e,mult,icon){const d=G.d;const o={};const r=calcHit(e,mult*(1
 function dealToEnemy(e,dmg,o){if(e.hp<=0)return;e.hp-=dmg;emit({t:'hit',uid:e.uid,a:dmg,crit:o.crit,cap:o.capped,icon:o.icon,color:o.color,proj:o.proj,pet:o.pet,big:o.big});if(e.hp<=0)killEnemy(e)}
 function killEnemy(e){
   const S=G.S,d=G.d,h=G.h,cd=D.CLASSES[S.cls];e.hp=0;emit({t:'kill',uid:e.uid,boss:e.boss,elite:e.elite});
-  const m=e.lvl,mult=(e.elite?3:1)*(e.boss?15:1);
-  const L=S.classes[S.cls].lvl;const pen=L>m+3?Math.max(.02,Math.pow(.85,L-m-3)):1;const xp=monXp(m)*mult*(1+d.xp/100)*pen;gainCombatXp(xp);
+  const m=e.lvl,mult=(e.elite?3:1)*(e.boss?15:1),xmult=(e.elite?2:1)*(e.boss?6:1);
+  const L=S.classes[S.cls].lvl;const pen=L>m+3?Math.max(.02,Math.pow(.85,L-m-3)):1;const xp=monXp(Math.min(m,L+2))*xmult*(1+d.xp/100)*pen;gainCombatXp(xp);
   const gold=monGold(m)*mult*(1+d.gold/100)*R(.8,1.2);S.gold+=gold;S.stats.gold+=gold;
   S.stats.kills++;if(e.elite)S.stats.elites++;
   if(cd.souls)h.souls=Math.min(d.soulMax,h.souls+1);
   if(d.killHeal)heal(d.maxHp*d.killHeal/100);
   const z=zoneDef();
+  const bon=onAction('kill');apGain('cls',S.cls,(e.boss?20:e.elite?3:1)*bon);if(e.elite||e.boss)deedProgress('elites');deedProgress('kills');
   // drops
-  const dc=e.boss?1:e.elite?.6:.12;
-  if(chance(dc)){gainItem(makeItem(m,rollRarity(d.mf,e.boss?2:e.elite?1:0)));if(e.boss)gainItem(makeItem(m,rollRarity(d.mf,1)))}
+  const dc=e.loot?1:Math.min(1,(e.boss?1:e.elite?.6:.12)*(1+d.dropPct/100));
+  if(chance(dc)){gainItem(makeItem(m,rollRarity(d.mf+(e.loot?e.loot*10:0),e.boss?2:e.elite?1:0)));if(e.boss)gainItem(makeItem(m,rollRarity(d.mf,1)))}
   if(chance(e.boss?1:e.elite?1:.15))addMat(z.mat,e.boss?RI(4,7):e.elite?RI(1,3):1);
   if(!e.def.tags.some(t=>['undead','construct','ooze','elemental'].includes(t))&&chance(.25))addMat('meat',e.boss?5:1);
   if(chance(.004*(e.boss?25:e.elite?5:1)))addMat(pick(['amethyst','ruby','sapphire','emerald','diamond'].slice(0,Math.min(5,1+Math.floor(S.zone/1.6)))),1);
@@ -294,13 +321,15 @@ function enemyAttack(e){
   let dmg=e.atk*mult*(1-red)*(1-d.dr/100)*R(.9,1.1);
   if(h.shield>0){const ab=Math.min(h.shield,dmg);h.shield-=ab;dmg-=ab}
   h.hp-=dmg;emit({t:'hurt',a:dmg,uid:e.uid,big:mult>1});
+  if(h.troops>=1&&chance(.25*(1-Math.min(.95,d.troopSafe/100)))){h.troops-=1;emit({t:'troopLoss'})}
   const cd=D.CLASSES[S.cls];if(cd.res.onHurt)h.res=Math.min(resMax(),h.res+cd.res.onHurt*(1+d.resGen/100));
   if(d.riposte&&chance(d.riposte/100))heroStrike(e,1,{icon:'🤺'});
   if(h.hp<=0){
     if(d.powers.phoenix&&h.phoenixT<=0){h.hp=d.maxHp*.3;h.phoenixT=60;emit({t:'cast',n:'Phoenix Rebirth',i:'🐦‍🔥'});return}
     heroDie();}
 }
-function heroDie(){const S=G.S,h=G.h;h.dead=true;h.hp=0;h.reviveT=S.qol.swiftRevive?3:8;S.stats.deaths++;emit({t:'death'});
+function searchDelay(){const d=G.d;return 3*(1-Math.min(.8,((d.search||0)+(G.S.qol.hounds?30:0))/100))}
+function heroDie(){const S=G.S,h=G.h;h.dead=true;h.hp=0;h.troops=Math.floor((h.troops||0)/2);h.reviveT=S.qol.swiftRevive?3:8;S.stats.deaths++;emit({t:'death'});
   if(G.cb&&G.cb.boss){S.bossReq=false;S.bossRetry=30;log(`💀 Defeated by ${zoneDef().boss.n}. Regroup and grow stronger.`,'death')}
   G.cb=null;}
 function usePotion(){const S=G.S;for(let t=5;t>=1;t--){if((S.potions[t]||0)>0){const rc=D.PROFS.alchemy.recipes.find(r=>r.pot===t);S.potions[t]--;const pot=1+(S.ps.alchemy.mastery[rc.id]||0)/200;heal(G.d.maxHp*rc.heal*pot);G.h.potT=8;emit({t:'cast',n:rc.n,i:rc.i});return true}}return false}
@@ -323,7 +352,7 @@ function combatTick(dt){
     if(G.cb&&G.cb.boss){}// boss done
     G.cb=G.cb&&G.cb.enemies.some(e=>e.hp>0)?G.cb:G.cb;
     const wt=(G.cb?G.cb.waveT:0)+dt;if(G.cb)G.cb.waveT=wt;
-    if(!G.cb||wt>.8){
+    if(!G.cb||wt>searchDelay()){
       const zs=S.zones[S.zone];S.bossRetry=Math.max(0,S.bossRetry-dt);
       const full=zs.kills>=D.KILLS_TO_BOSS;
       const doBoss=full&&(S.bossReq||(S.qol.autoBoss&&S.settings.autoBoss&&S.bossRetry<=0));
@@ -336,6 +365,8 @@ function combatTick(dt){
   // pets & allies
   if(cd.pet){h.petT-=dt*(1+d.petSpeed/100);while(h.petT<=0){h.petT+=cd.pet.int;const t=C.tgt();if(t)petStrike(t,cd.pet.mult,'🐺')}}
   if(S.cls==='warlock'&&(h.impT>0||d.permImp)){h.impT-=dt;h.impAtk-=dt;if(h.impAtk<=0){h.impAtk=1.5;const t=C.tgt();if(t)petStrike(t,d.permImp?Math.max(h.impMult,1.2):h.impMult,'😈')}}
+  if(cd.troops&&h.troops>=1){h.troopT-=dt;if(h.troopT<=0){h.troopT=2;const t=C.tgt();if(t){const r2=calcHit(t,.12*h.troops*(1+d.troopDmg/100),{});dealToEnemy(t,r2.dmg,{crit:r2.crit,capped:r2.capped,icon:'💂',pet:1})}}}
+  {const sm=relicMod('summonMult')||1;for(const su of S.summons){if(su.role!=='fight')continue;h.sumT[su.uid]=(h.sumT[su.uid]||Math.random()*2.5)-dt;if(h.sumT[su.uid]<=0){h.sumT[su.uid]=2.5;const t=C.tgt();if(t)petStrike(t,.25*su.power*sm,D.SUMMONS.find(x=>x.id===su.type).i)}}}
   if(S.qol.sellsword){h.swT-=dt;if(h.swT<=0){h.swT=2;const t=C.tgt();if(t)petStrike(t,.6,'🗡️')}}
   if(S.qol.acolyte){h.acoT-=dt;if(h.acoT<=0){h.acoT=3;if(h.hp<d.maxHp*.9){heal(d.maxHp*.05*(1+d.petDmg/200))}}}
   // dots
@@ -346,75 +377,149 @@ function combatTick(dt){
     e.t-=dt*(e.slowT>0?.5:1);let g=0;while(e.t<=0&&g++<10&&e.hp>0){e.t+=e.spd;enemyAttack(e);if(G.h.dead)return}}
 }
 
-/* ---------- professions ---------- */
-function profSpeed(slotIdx){const info=actionSlotsInfo()[slotIdx]||{eff:.75};const d=G.d;return info.eff*(1+(d.profSpeed||0)/100)}
+/* ---------- professions (v2) ---------- */
+function profSpeed(si,p){const info=actionSlotsInfo()[si]||{eff:.75};const d=G.d;let eff=info.eff;
+  if(si>0)eff*=1+((d.helperEff||0)+pm(p,'mentor')*5)/100;
+  return eff*(1+((d.profSpeed||0)+(d.actSpeed||0)+pm(p,'eff')*3+summonWork(p))/100)}
 function toolMult(p){return 1+.15*(G.S.tools[p]||0)}
+function profSucc(p,req){const S=G.S,d=G.d;return Math.max(.05,Math.min(.97,.4+.02*(S.profs[p].lvl-req)+(pm(p,'steady')*1.5+(d.profSucc||0))/100))}
+function bountyRoll(p){const d=G.d;const c=((d.bounty||0)+pm(p,'bounty')*3)/100;return Math.floor(c)+(chance(c%1)?1:0)}
+function summonCap(){return 1+Math.floor(G.S.profs.summoning.lvl/12)+(relicMod('summonSlots')||0)}
+function summonWork(p){let w=0;const sm=relicMod('summonMult')||1;for(const su of G.S.summons)if(su.role===p)w+=su.power*3*sm;return w}
+function favorTier(f){return Math.min(10,Math.floor(Math.log2(f/10+1)))}
 function hasMats(inp,n=1){const S=G.S;for(const k in inp)if((S.mats[k]||0)<inp[k]*n)return false;return true}
 function useMats(inp){const S=G.S;for(const k in inp)S.mats[k]-=inp[k]}
 function enchCost(it){return Math.ceil(5*Math.pow(1.45,it.ench||0)*(1+it.il/15))}
-function enchChance(it){const lv=G.S.profs.enchanting.lvl;return Math.max(5,Math.min(95,95-(it.ench||0)*8+lv*.4))}
+function enchChance(it){const S=G.S,lv=S.profs.enchanting.lvl,d=G.d;return Math.max(3,Math.min(95,70-(it.ench||0)*8+lv*.5+pm('enchanting','steady')*1.5+(d.profSucc||0)+(S.relics.rune?25:0)))}
 function smithCost(t,slot){const n=slot==='weapon'?6:slot==='chest'?8:4;const inp={};inp[t.ore]=n;inp[t.mat]=(inp[t.mat]||0)+2;return inp}
-function crackChance(target){if(G.S.relics.forge)return 0;return Math.max(0,(target-60)*.8*(1-G.S.profs.smithing.lvl/150))/100}
+function crackChance(target){const S=G.S;if(S.relics.forge)return 0;const t=D.PROFS.smithing.tiers.find(x=>x.id===S.ps.smithing.tier)||{lv:1};return Math.max(0,Math.min(.95,(1-profSucc('smithing',t.lv))+(target-60)*.008))}
+function profDone(p,ok,req,t,mult=1){const xp=actXp(req,t)*mult; // shared bookkeeping for every profession action
+  const S=G.S;addProfXp(p,ok?xp:xp*.3);const bon=onAction('prof',p);apGain('prof',p,(ok?1:.3)*bon);if(ok)deedProgress('prof',p);rollRelics({prof:p});
+}
 function herbTick(dt){
   const S=G.S,hs=S.ps.herbalism;const n=plotsCount();while(hs.plots.length<n)hs.plots.push(null);
-  const tended=S.slots.some(sl=>sl.act&&sl.act.type==='prof'&&sl.act.p==='herbalism');
-  const sp=(tended?2:1)*toolMult('herbalism')*(1+(G.d.profSpeed||0)/100);
+  const tended=S.slots.map((sl,i)=>sl.act&&sl.act.type==='prof'&&sl.act.p==='herbalism'?i:-1).filter(i=>i>=0);
+  const sp=(tended.length?2:1)*toolMult('herbalism')*(tended.length?Math.max(...tended.map(i=>profSpeed(i,'herbalism'))):1+((G.d.profSpeed||0)+pm('herbalism','eff')*3)/100);
   for(const p of hs.plots)if(p&&p.g<p.max)p.g=Math.min(p.max,p.g+dt*sp);
-  if(tended||S.qol.autoHarvest){
+  if(tended.length||S.qol.autoHarvest){
     const lv=S.profs.herbalism.lvl;
     for(let i=0;i<hs.plots.length;i++){let p=hs.plots[i];
-      if(p&&p.g>=p.max){const sd=D.PROFS.herbalism.seeds.find(x=>x.id===p.s);let q=(2+Math.floor(lv/15))*(p.gold?5:1)*(relicMod('gatherMult')||1);addMat(p.s,q);addProfXp('herbalism',sd.xp*(p.gold?3:1));if(p.gold)log(`🌟 Golden ${D.MATS[p.s].n} harvested! (+${q})`,'prof');emit({t:'harvest',i,gold:p.gold});rollRelics({prof:'herbalism'});hs.plots[i]=p=null}
-      if(!p){const sd=D.PROFS.herbalism.seeds.find(x=>x.id===hs.seed);if(sd&&sd.lv<=lv)hs.plots[i]={s:sd.id,g:0,max:sd.t,gold:chance(.03+lv*.0005)}}}
+      if(p&&p.g>=p.max){const sd=D.PROFS.herbalism.seeds.find(x=>x.id===p.s);const ok=chance(profSucc('herbalism',sd.lv));
+        let q=ok?(1+Math.floor(lv/20)+bountyRoll('herbalism'))*(p.gold?5:1)*(relicMod('gatherMult')||1):1;addMat(p.s,q);
+        profDone('herbalism',ok,sd.lv,sd.t/6,p.gold?3:1);if(p.gold&&ok)log(`🌟 Golden ${D.MATS[p.s].n} harvested! (+${q})`,'prof');emit({t:'harvest',i,gold:p.gold&&ok});hs.plots[i]=p=null}
+      if(!p){const sd=D.PROFS.herbalism.seeds.find(x=>x.id===hs.seed);if(sd&&sd.lv<=lv)hs.plots[i]={s:sd.id,g:0,max:sd.t,gold:chance(.02+lv*.0004)}}}
   }
 }
+function timed(sl,dt,sp,t){sl.prog+=dt*sp/t;if(sl.prog>=1){sl.prog=0;return true}return false}
 function profTick(si,dt){
-  const S=G.S,sl=S.slots[si],p=sl.act.p,sp=profSpeed(si)*toolMult(p);sl.note='';
+  const S=G.S,sl=S.slots[si],p=sl.act.p,sp=profSpeed(si,p)*toolMult(p);sl.note='';const lv=S.profs[p].lvl;
   if(p==='herbalism'){sl.prog=0;return}
-  if(p==='mining'){const ms=S.ps.mining,nd=D.PROFS.mining.nodes.find(x=>x.id===ms.node);if(!nd||nd.lv>S.profs.mining.lvl){sl.note='Level too low';return}
-    sl.prog+=dt*sp/nd.t;while(sl.prog>=1){sl.prog-=1;ms.streak=Math.min(20,(ms.streak||0)+1);let q=1+ms.streak*.05;q=Math.floor(q)+(chance(q%1)?1:0);q*=relicMod('gatherMult')||1;
-      addMat(nd.id,q);addProfXp('mining',nd.xp);if(chance(.015+S.profs.mining.lvl*.0004)){addMat(nd.gem,1);log(`💎 Unearthed a ${D.MATS[nd.gem].n}!`,'prof')}
-      emit({t:'mine',si});rollRelics({prof:'mining'})}return}
-  if(p==='smithing'){const ss=S.ps.smithing,t=D.PROFS.smithing.tiers.find(x=>x.id===ss.tier);if(!t||t.lv>S.profs.smithing.lvl){sl.note='Level too low';return}
+  if(p==='mining'){const ms=S.ps.mining,nd=D.PROFS.mining.nodes.find(x=>x.id===ms.node);if(!nd||nd.lv>lv){sl.note='Level too low';return}
+    if(timed(sl,dt,sp,nd.t)){const ok=chance(profSucc('mining',nd.lv));
+      if(ok){ms.streak=Math.min(20,(ms.streak||0)+1);let q=1+ms.streak*.05;q=Math.floor(q)+(chance(q%1)?1:0)+bountyRoll('mining');q*=relicMod('gatherMult')||1;
+        addMat(nd.id,q);if(chance(.01+lv*.0003)){addMat(nd.gem,1);log(`💎 Unearthed a ${D.MATS[nd.gem].n}!`,'prof')}emit({t:'mine',si})}
+      else{ms.streak=0;emit({t:'fail',si})}
+      profDone('mining',ok,nd.lv,nd.t)}return}
+  if(p==='smithing'){const ss=S.ps.smithing,t=D.PROFS.smithing.tiers.find(x=>x.id===ss.tier);if(!t||t.lv>lv){sl.note='Level too low';return}
     const inp=smithCost(t,ss.slot);
     if(!sl.busy){if(!hasMats(inp)){sl.note='Need materials';sl.heat=Math.max(0,sl.heat-dt*10);return}useMats(inp);sl.busy=1;sl.heat=0}
-    sl.heat+=dt*12*sp;sl.prog=Math.min(1,sl.heat/ss.target);
-    if(sl.heat>=ss.target){sl.busy=0;sl.heat=0;sl.prog=0;addProfXp('smithing',t.xp*(ss.target/65));rollRelics({prof:'smithing'});
-      if(chance(crackChance(ss.target))){log(`💥 The ${t.n} piece cracked in the quench!`,'prof');emit({t:'crack',si});return}
-      const lv=S.profs.smithing.lvl;const qual=(ss.target-40)*3+lv*1.5;
-      const outs=relicMod('craftMult')||1;
+    sl.heat+=dt*5*sp;sl.prog=Math.min(1,sl.heat/ss.target);
+    if(sl.heat>=ss.target){sl.busy=0;sl.heat=0;sl.prog=0;const ok=!chance(crackChance(ss.target));profDone('smithing',ok,t.lv,ss.target/5+3);
+      if(!ok){emit({t:'crack',si});return}
+      const qual=(ss.target-40)*3+lv*1.5;const outs=(relicMod('craftMult')||1)*(1+bountyRoll('smithing'));
       for(let k=0;k<outs;k++){let r=rollRarity(qual,1);if(chance(.05))r=Math.min(S.astral.mythic?5:4,r+1);if(S.relics.forge)r=Math.min(S.astral.mythic?5:4,r+1);
         const it=makeItem(t.il+Math.floor(lv/8),r,ss.slot);it.n='Forged '+it.n;S.stats.crafted++;gainItem(it,'Forged');}
       emit({t:'forge',si})}
     return}
-  if(p==='alchemy'){const as=S.ps.alchemy,rc=D.PROFS.alchemy.recipes.find(x=>x.id===as.recipe);if(!rc||rc.lv>S.profs.alchemy.lvl){sl.note='Level too low';return}
+  if(p==='alchemy'){const as=S.ps.alchemy,rc=D.PROFS.alchemy.recipes.find(x=>x.id===as.recipe);if(!rc||rc.lv>lv){sl.note='Level too low';return}
     if(!sl.busy){if(!hasMats(rc.in)){sl.note='Need ingredients';return}useMats(rc.in);sl.busy=1;sl.prog=0}
-    sl.prog+=dt*sp/4;if(sl.prog>=1){sl.prog=0;sl.busy=0;const m=as.mastery[rc.id]||0;let n=(1+(chance(m/200)?1:0))*(relicMod('craftMult')||1);
+    if(timed(sl,dt,sp,8)){sl.busy=0;const ok=chance(profSucc('alchemy',rc.lv));profDone('alchemy',ok,rc.lv,8);if(!ok){emit({t:'fizzle',si});return}
+      const m=as.mastery[rc.id]||0;let n=(1+(chance(m/200)?1:0)+bountyRoll('alchemy'))*(relicMod('craftMult')||1);
       if(rc.pot)S.potions[rc.pot]=(S.potions[rc.pot]||0)+n;else S.elixirs[rc.id]=(S.elixirs[rc.id]||0)+n;
-      if(chance(1-m/120))as.mastery[rc.id]=Math.min(100,m+1);addProfXp('alchemy',rc.xp);
+      if(chance(1-m/120))as.mastery[rc.id]=Math.min(100,m+1);
       if(chance(.04)){const el=pick(D.PROFS.alchemy.recipes.filter(x=>x.elix));S.elixirs[el.id]=(S.elixirs[el.id]||0)+1;log(`💥 Volatile reaction! Bonus ${el.n}.`,'prof')}
-      emit({t:'brew',si});rollRelics({prof:'alchemy'})}return}
-  if(p==='cooking'){const cs=S.ps.cooking,rc=D.PROFS.cooking.recipes.find(x=>x.id===cs.recipe);if(!rc||rc.lv>S.profs.cooking.lvl){sl.note='Level too low';return}
+      emit({t:'brew',si})}return}
+  if(p==='cooking'){const cs=S.ps.cooking,rc=D.PROFS.cooking.recipes.find(x=>x.id===cs.recipe);if(!rc||rc.lv>lv){sl.note='Level too low';return}
     if(!sl.busy){if(!hasMats(rc.in)){sl.note='Need ingredients';return}useMats(rc.in);sl.busy=1;sl.prog=0}
-    sl.prog+=dt*sp/5;if(sl.prog>=1){sl.prog=0;sl.busy=0;const lv=S.profs.cooking.lvl,diff=lv-rc.lv;
-      const burn=Math.max(.02,.4-diff*.03),perf=Math.min(.3,Math.max(0,diff*.015));addProfXp('cooking',rc.xp);rollRelics({prof:'cooking'});
-      if(chance(burn)){emit({t:'burn',si});return}
-      const n=relicMod('craftMult')||1;if(chance(perf))S.foodP[rc.id]=(S.foodP[rc.id]||0)+n;else S.food[rc.id]=(S.food[rc.id]||0)+n;
+    if(timed(sl,dt,sp,10)){sl.busy=0;const diff=lv-rc.lv;const ok=chance(profSucc('cooking',rc.lv));const perf=Math.min(.3,Math.max(0,diff*.015));profDone('cooking',ok,rc.lv,10);
+      if(!ok){emit({t:'burn',si});return}
+      const n=(relicMod('craftMult')||1)*(1+bountyRoll('cooking'));if(chance(perf))S.foodP[rc.id]=(S.foodP[rc.id]||0)+n;else S.food[rc.id]=(S.food[rc.id]||0)+n;
       const c=(cs.count[rc.id]||0)+1;cs.count[rc.id]=c;if(c===25||c===100||c===500){log(`👨‍🍳 Signature ${rc.n} tier ${c===25?1:c===100?2:3} earned!`,'prof');G.dirty=true}
       emit({t:'cook',si})}return}
   if(p==='enchanting'){const es=S.ps.enchanting,it=S.equip[es.slot];if(!it){sl.note='Nothing equipped';return}if((it.ench||0)>=15){sl.note='Maxed at +15';return}
     const cost=enchCost(it);if(!sl.busy){if((S.mats.dust||0)<cost){sl.note='Need Arcane Dust';return}S.mats.dust-=cost;sl.busy=1;sl.prog=0}
-    sl.prog+=dt*sp/4;if(sl.prog>=1){sl.prog=0;sl.busy=0;addProfXp('enchanting',10+(it.ench||0)*8+it.il*.5);
-      if(chance(enchChance(it)/100)){it.ench=(it.ench||0)+1;S.stats.maxEnch=Math.max(S.stats.maxEnch,it.ench);G.dirty=true;emit({t:'ench',ok:1,si});if(it.ench>=5)log(`🔮 ${it.n} enchanted to +${it.ench}!`,'prof')}
-      else{emit({t:'ench',ok:0,si});if(it.ench>=5){const gems=Object.keys(S.mats).filter(k=>D.MATS[k]&&D.MATS[k].gem&&S.mats[k]>0);
-        if(es.ward&&gems.length){S.mats[gems[0]]--;}else{it.ench--;G.dirty=true;log(`🔮 Enchant failed — ${it.n} dropped to +${it.ench}.`,'prof')}}}
-      rollRelics({prof:'enchanting'})}return}
+    if(timed(sl,dt,sp,12)){sl.busy=0;const ok=chance(enchChance(it)/100);profDone('enchanting',ok,Math.max(1,it.il/2+(it.ench||0)*2),12);
+      if(ok){it.ench=(it.ench||0)+1;S.stats.maxEnch=Math.max(S.stats.maxEnch,it.ench);G.dirty=true;emit({t:'ench',ok:1,si});if(it.ench>=5)log(`🔮 ${it.n} enchanted to +${it.ench}!`,'prof')}
+      else{emit({t:'ench',ok:0,si});if(it.ench>=5&&!S.relics.rune){const gems=Object.keys(S.mats).filter(k=>D.MATS[k]&&D.MATS[k].gem&&S.mats[k]>0);
+        if(es.ward&&gems.length){S.mats[gems[0]]--;}else{it.ench--;G.dirty=true;log(`🔮 Enchant failed — ${it.n} dropped to +${it.ench}.`,'prof')}}}}return}
+  if(p==='summoning'){const ss=S.ps.summoning,sd=D.SUMMONS.find(x=>x.id===ss.target);if(!sd||sd.lv>lv){sl.note='Level too low';return}
+    if(!sl.busy){if(!hasMats(sd.in)){sl.note='Need materials';return}useMats(sd.in);sl.busy=1;sl.prog=0}
+    if(timed(sl,dt,sp,sd.t)){sl.busy=0;const ok=chance(profSucc('summoning',sd.lv));profDone('summoning',ok,sd.lv,sd.t);
+      if(!ok){emit({t:'fail',si});return}
+      const su={uid:S.nextId++,type:sd.id,power:Math.round(sd.power*(1+lv*.02)*100)/100,role:'fight'};
+      if(S.summons.length<summonCap()){S.summons.push(su);log(`🔯 Bound a ${sd.n} (power ${su.power}).`,'prof')}
+      else{let w=null;for(const x of S.summons)if(!w||x.power<w.power)w=x;
+        if(w&&w.power<su.power){su.role=w.role;S.summons[S.summons.indexOf(w)]=su;log(`🔯 A ${sd.n} (power ${su.power}) replaced a weaker creature.`,'prof')}else apGain('prof','summoning',5)}
+      emit({t:'summon',si})}return}
+  if(p==='dancing'){const ds=S.ps.dancing,dd=D.DANCES.find(x=>x.id===ds.target);if(!dd||dd.lv>lv){sl.note='Level too low';return}
+    if(timed(sl,dt,sp,dd.t)){const ok=chance(profSucc('dancing',dd.lv));profDone('dancing',ok,dd.lv,dd.t);
+      if(ok){ds.combo=(ds.combo||0)+1;emit({t:'step',si});if(ds.combo>=8){ds.combo=0;const cur=S.dance&&S.dance.id===dd.id?S.dance.t:0;S.dance={id:dd.id,t:Math.min(3600,cur+300)};
+        const tip=2*Math.pow(1.12,lv)*(1+bountyRoll('dancing'));S.gold+=tip;S.stats.gold+=tip;addProfXp('dancing',actXp(dd.lv,dd.t)*2);G.dirty=true;emit({t:'routine',si})}}
+      else{ds.combo=0;emit({t:'fail',si})}}return}
+  if(p==='praying'){const ps=S.ps.praying,dv=D.DEITIES.find(x=>x.id===ps.target);if(!dv||dv.lv>lv){sl.note='Level too low';return}
+    if(timed(sl,dt,sp,dv.t)){const ok=chance(profSucc('praying',dv.lv));profDone('praying',ok,dv.lv,dv.t);
+      if(ok){const before=favorTier(ps.favor[dv.id]||0);ps.favor[dv.id]=(ps.favor[dv.id]||0)+1+lv/20+bountyRoll('praying');const t=favorTier(ps.favor[dv.id]);if(t>before){G.dirty=true;log(`🙏 ${dv.n} grants you blessing tier ${t}.`,'prof')}
+        if(chance(.005)){S.ap.gen+=25;S.stats.apEarned+=25;log('✨ A miracle! +25 general AP.','prof')}emit({t:'pray',si})}else emit({t:'fail',si})}return}
+  if(p==='advising'){const as=S.ps.advising,pt=D.PETITIONERS.find(x=>x.id===as.target);if(!pt||pt.lv>lv){sl.note='Level too low';return}
+    if(timed(sl,dt,sp,pt.t)){const ok=chance(profSucc('advising',pt.lv));profDone('advising',ok,pt.lv,pt.t);const before=as.rep||0;
+      if(ok){const g=pt.gold*(1+before/500)*(1+bountyRoll('advising'));S.gold+=g;S.stats.gold+=g;as.rep=before+pt.rep;emit({t:'counsel',si,a:g})}
+      else{as.rep=Math.max(0,before-pt.rep*2);emit({t:'fail',si})}
+      for(const pk of D.REP_PERKS)if(before<pk.at&&as.rep>=pk.at){log(`📜 Reputation ${pk.at}: ${pk.d}`,'prof');G.dirty=true;syncSlots()}}return}
+  if(p==='bard'){const bs=S.ps.bard,sg=D.SONGS.find(x=>x.id===bs.target);if(!sg||sg.lv>lv){sl.note='Level too low';return}
+    if(timed(sl,dt,sp,sg.t)){const ok=chance(profSucc('bard',sg.lv));profDone('bard',ok,sg.lv,sg.t);
+      if(ok){const enc=chance(Math.min(.3,(bs.fame||0)/5000));const g=1.5*Math.pow(1.12,lv)*(1+(bs.fame||0)/200)*(enc?2:1)*(1+bountyRoll('bard'));S.gold+=g;S.stats.gold+=g;bs.fame=(bs.fame||0)+1;
+        const m=bs.mastery[sg.id]||0;if(chance(1-m/120)){bs.mastery[sg.id]=Math.min(100,m+1);if(bs.anthem===sg.id)G.dirty=true}emit({t:'song',si,enc})}else emit({t:'fail',si})}return}
+  if(p==='fishing'){const fs=S.ps.fishing,sp2=D.FISHING.find(x=>x.id===fs.target);if(!sp2||sp2.lv>lv){sl.note='Level too low';return}
+    if(!sl.need){sl.need=sp2.t*R(.5,1.8);sl.needT=sl.need}
+    if(timed(sl,dt,sp,sl.need)){sl.need=0;const ok=chance(profSucc('fishing',sp2.lv));profDone('fishing',ok,sp2.lv,sl.needT||sp2.t);
+      if(ok){addMat('fish',(sp2.fish+bountyRoll('fishing'))*(relicMod('gatherMult')||1));emit({t:'fish',si});
+        if(chance(.02)){const it=makeItem(sp2.lv+5,rollRarity(G.d.mf+50,1));gainItem(it,'Sunken treasure');const g=5*Math.pow(1.1,sp2.lv);S.gold+=g;S.stats.gold+=g;log(`🎣 Hooked a sunken chest! <span class="r${it.r}">${it.n}</span>`,'prof')}}
+      else emit({t:'fail',si})}return}
 }
+
+/* ---------- action points, daily, deeds ---------- */
+function localDate(t){const d=new Date(t||Date.now());return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function dailyCheck(){const S=G.S,today=localDate();const dl=S.daily;if(dl.date===today)return;
+  const y=localDate(Date.now()-864e5);dl.streak=dl.date===y?(dl.streak||0)+1:1;dl.date=today;dl.count=0;
+  const gift=10*Math.min(7,dl.streak);S.ap.gen+=gift;S.stats.apEarned+=gift;
+  if(S.started)log(`📅 New day! Daily streak ${dl.streak} — +${gift} general AP. Your first ${dailyCap()} actions today earn double AP.`,'ach');
+  const pool=D.DEEDS.slice();const list=[];const sc=1+Math.min(2,S.ascensions*.1);
+  while(list.length<3&&pool.length){const t=pool.splice(RI(0,pool.length-1),1)[0];const it={t:t.t,n:Math.ceil(t.n*sc),prog:0,done:false};if(t.t==='prof'){const top=D.PROF_ORDER.slice().sort((a,b)=>S.profs[b].lvl-S.profs[a].lvl).slice(0,4);it.p=pick(top)}list.push(it)}
+  S.deeds={date:today,list};}
+function dailyCap(){return D.DAILY_CAP+((G.d&&G.d.dailyCap)||0)}
+function onAction(kind,p){const S=G.S;S.stats.actions++;let bon=1;if(S.daily.count<dailyCap()){bon=2;S.daily.count++}
+  deedProgress('actions');const g=.1*bon*apMult();S.ap.gen+=g;S.stats.apEarned+=g;return bon}
+function apMult(){const d=G.d;return 1+(d.apPct||0)/100}
+function apGain(pool,key,amt){const S=G.S,d=G.d;let a=amt*apMult();if(pool==='prof')a*=1+(d.profApPct||0)/100;
+  if(pool==='cls')S.ap.cls[key]=(S.ap.cls[key]||0)+a;else if(pool==='prof')S.ap.prof[key]=(S.ap.prof[key]||0)+a;else S.ap.gen+=a;S.stats.apEarned+=a}
+function deedProgress(t,p){const S=G.S;for(const dd of S.deeds.list){if(dd.done||dd.t!==t||(dd.p&&dd.p!==p))continue;dd.prog++;
+  if(dd.prog>=dd.n){dd.done=true;const rw=30+5*Math.min(7,S.daily.streak||1);S.ap.gen+=rw;S.stats.apEarned+=rw;S.stats.deedsDone++;const g=monGold(Math.max(5,highestLevelReached()))*40;S.gold+=g;S.stats.gold+=g;
+    log(`📜 Daily deed complete: ${deedText(dd)} — +${rw} general AP, +${fmt(g)} gold`,'ach');emit({t:'deed'})}}}
+function deedText(dd){const t=D.DEEDS.find(x=>x.t===dd.t);return t.d(dd.n,dd.p)}
+function masteryCost(node,r){return Math.ceil(node.base*Math.pow(node.mult,r))}
+function buyMastery(tree,key,id){const S=G.S;let node,ranks,pool;
+  if(tree==='gen'){node=D.AP_GEN.find(x=>x.id===id);ranks=S.mastery.gen;pool=()=>S.ap.gen;}
+  else if(tree==='cls'){node=id==='sig'?Object.assign({id:'sig',base:15,mult:1.25,max:20},D.CLASSES[key].apNode):D.AP_CLASS.find(x=>x.id===id);ranks=S.mastery.cls[key]=S.mastery.cls[key]||{};pool=()=>S.ap.cls[key]||0}
+  else{node=D.AP_PROF.find(x=>x.id===id);ranks=S.mastery.prof[key]=S.mastery.prof[key]||{};pool=()=>S.ap.prof[key]||0}
+  if(!node)return false;const r=ranks[id]||0;if(r>=node.max)return false;const c=masteryCost(node,r);if(pool()<c)return false;
+  if(tree==='gen')S.ap.gen-=c;else if(tree==='cls')S.ap.cls[key]-=c;else S.ap.prof[key]-=c;ranks[id]=r+1;S.stats.apSpent+=c;G.dirty=true;return true}
 
 /* ---------- consumables ---------- */
 function eatBest(){const S=G.S;const recs=D.PROFS.cooking.recipes.slice().reverse();for(const rc of recs){if((S.foodP[rc.id]||0)>0){S.foodP[rc.id]--;S.meal={id:rc.id,t:600,p:1};G.dirty=true;return rc}if((S.food[rc.id]||0)>0){S.food[rc.id]--;S.meal={id:rc.id,t:600,p:0};G.dirty=true;return rc}}return null}
 function eatMeal(id,perfect){const S=G.S,store=perfect?S.foodP:S.food;if((store[id]||0)<=0)return;store[id]--;S.meal={id,t:600,p:perfect?1:0};G.dirty=true}
 function drinkElixir(id){const S=G.S;if((S.elixirs[id]||0)<=0)return;S.elixirs[id]--;const rc=D.PROFS.alchemy.recipes.find(x=>x.id===id);S.elix[id]=(S.elix[id]>0?S.elix[id]:0)+rc.dur;G.dirty=true}
 function consumablesTick(dt){const S=G.S;
+  if(S.dance){S.dance.t-=dt;if(S.dance.t<=0){S.dance=null;G.dirty=true}}
   if(S.meal&&!S.relics.ladle){S.meal.t-=dt;if(S.meal.t<=0){S.meal=null;G.dirty=true}}
   for(const k in S.elix){if(S.elix[k]>0){S.elix[k]-=dt;if(S.elix[k]<=0){S.elix[k]=0;G.dirty=true}}}
   if(S.qol.autoEat&&S.settings.autoEat&&!S.meal)eatBest();
@@ -424,7 +529,7 @@ function consumablesTick(dt){const S=G.S;
 /* ---------- main tick ---------- */
 function tick(dt){
   const S=G.S;if(!S.started)return;if(G.dirty||!G.d)recalc();
-  S.stats.play+=dt;
+  S.stats.play+=dt;G._dc=(G._dc||0)+dt;if(G._dc>5||!S.daily.date){G._dc=0;dailyCheck()}
   consumablesTick(dt);if(G.dirty)recalc();
   herbTick(dt);
   for(let i=0;i<S.slots.length;i++){const sl=S.slots[i];if(!sl.act)continue;
@@ -446,11 +551,11 @@ function respecCost(){const L=G.S.classes[G.S.cls].lvl;return L<=10?0:Math.floor
 function respec(){const S=G.S,cl=S.classes[S.cls];const c=respecCost();if(S.gold<c)return false;S.gold-=c;let n=0;for(const k in cl.ranks)n+=cl.ranks[k];cl.ranks={};cl.pts+=n;G.dirty=true;return true}
 function switchClass(c){const S=G.S;if(!S.unlockedCls[c]||S.cls===c)return;S.cls=c;if(S.cls2===c)S.cls2=null;autoFirst(c);G.dirty=true;recalc();newHero();G.cb=null;log(`🎭 You are now a ${D.CLASSES[c].n}.`,'info')}
 function upgradeCost(base,mult,l){return Math.ceil(base*Math.pow(mult,l))}
-function buyQol(id){const S=G.S,q=D.QOL.find(x=>x.id===id);if(!q||S.qol[id]||S.gold<q.cost)return false;S.gold-=q.cost;S.qol[id]=1;syncSlots();G.dirty=true;log(`🏰 Unlocked ${q.n}`,'info');return true}
-function buyGuild(id){const S=G.S,g=D.GUILD.find(x=>x.id===id),l=S.guild[id]||0,c=upgradeCost(g.base,g.mult,l);if(S.gold<c)return false;S.gold-=c;S.guild[id]=l+1;G.dirty=true;return true}
-function buyTool(p){const S=G.S,l=S.tools[p]||0;if(l>=D.TOOLS.max)return false;const c=upgradeCost(D.TOOLS.base,D.TOOLS.mult,l);if(S.gold<c)return false;S.gold-=c;S.tools[p]=l+1;return true}
-function buySatchel(){const S=G.S;if(S.satchel>=D.SATCHEL.max)return false;const c=upgradeCost(D.SATCHEL.base,D.SATCHEL.mult,S.satchel);if(S.gold<c)return false;S.gold-=c;S.satchel++;return true}
-function buyPlot(){const S=G.S;if(S.plotsBought>=D.PLOTS.max)return false;const c=upgradeCost(D.PLOTS.base,D.PLOTS.mult,S.plotsBought);if(S.gold<c)return false;S.gold-=c;S.plotsBought++;return true}
+function buyQol(id){const S=G.S,q=D.QOL.find(x=>x.id===id);const c=townCost(q.cost);if(!q||S.qol[id]||S.gold<c)return false;S.gold-=c;S.qol[id]=1;syncSlots();G.dirty=true;log(`🏰 Unlocked ${q.n}`,'info');return true}
+function buyGuild(id){const S=G.S,g=D.GUILD.find(x=>x.id===id),l=S.guild[id]||0,c=townCost(upgradeCost(g.base,g.mult,l));if(S.gold<c)return false;S.gold-=c;S.guild[id]=l+1;G.dirty=true;return true}
+function buyTool(p){const S=G.S,l=S.tools[p]||0;if(l>=D.TOOLS.max)return false;const c=townCost(upgradeCost(D.TOOLS.base,D.TOOLS.mult,l));if(S.gold<c)return false;S.gold-=c;S.tools[p]=l+1;return true}
+function buySatchel(){const S=G.S;if(S.satchel>=D.SATCHEL.max)return false;const c=townCost(upgradeCost(D.SATCHEL.base,D.SATCHEL.mult,S.satchel));if(S.gold<c)return false;S.gold-=c;S.satchel++;return true}
+function buyPlot(){const S=G.S;if(S.plotsBought>=D.PLOTS.max)return false;const c=townCost(upgradeCost(D.PLOTS.base,D.PLOTS.mult,S.plotsBought));if(S.gold<c)return false;S.gold-=c;S.plotsBought++;return true}
 function buyAstral(id){const S=G.S,a=D.ASTRAL.find(x=>x.id===id),l=S.astral[id]||0;if(l>=a.max)return false;const c=upgradeCost(a.base,a.mult,l);if(S.shards<c)return false;S.shards-=c;S.astral[id]=l+1;syncSlots();G.dirty=true;return true}
 
 /* ---------- ascension ---------- */
@@ -459,7 +564,7 @@ function shardPreview(){const S=G.S;const m=highestLevelReached();if(m<20)return
 function canAscend(){return G.S.zones[2].cleared}
 function ascend(){
   const S=G.S;if(!canAscend())return false;const gain=shardPreview();const keep=newState();
-  const persist=['name','qol','settings','astral','relics','relicTries','ach','stats','unlockedCls','log','satchel','plotsBought','started'];
+  const persist=['name','qol','settings','astral','relics','relicTries','ach','stats','unlockedCls','log','satchel','plotsBought','started','ap','mastery','daily','deeds'];
   for(const k of persist)keep[k]=S[k];
   keep.shards=S.shards+gain;keep.ascensions=S.ascensions+1;keep.cls=S.cls;
   const mem=(S.astral.memory||0)*.1;for(const p of D.PROF_ORDER){keep.profs[p].lvl=Math.max(1,Math.floor(S.profs[p].lvl*mem))}
@@ -468,17 +573,25 @@ function ascend(){
   log(`🌟 ASCENDED! Gained ${fmt(gain)} Astral Shards. (Ascension ${keep.ascensions})`,'relic');return gain;
 }
 function autoFirst(c){const cl=G.S.classes[c];const f=D.CLASSES[c].skills[0].id;if(!cl.ranks[f]&&cl.pts>0){cl.ranks[f]=1;cl.pts--}}
-function giveStarter(){const S=G.S;autoFirst(S.cls);const it=makeItem(1,0,'weapon');it.n='Worn '+D.CLASSES[S.cls].wn[0];S.equip.weapon=it}
+function giveStarter(){const S=G.S;autoFirst(S.cls);const it=makeItem(1,0,'weapon');it.aff=[];it.n='Splintered Training '+D.CLASSES[S.cls].wn[0];S.equip.weapon=it}
 
 /* ---------- save / load / offline ---------- */
 function serialize(){G.S.last=Date.now();return JSON.stringify(G.S)}
 function save(){try{localStorage.setItem(SAVE_KEY,serialize())}catch(e){}}
-function loadFrom(json){const s=JSON.parse(json);deepFill(s,newState());G.S=s;syncSlots();G.dirty=true;recalc();newHero();return s}
+function migrate(s){if((s.v||1)>=2)return null;
+  const old=s.v||1;s.v=2;s.settings.speed=1;s.unlockedCls=s.unlockedCls||{};s.unlockedCls.worker=1;
+  if(s.qol){if(s.qol.speed15){delete s.qol.speed15;s.qol.hounds=1}if(s.qol.speed2){delete s.qol.speed2;s.qol.ledger=1}}
+  if(s.astral&&s.astral.warp3){delete s.astral.warp3;s.astral.haste=(s.astral.haste||0)+2}
+  const kills=(s.stats&&s.stats.kills)||0;const gen=Math.round(50+kills/25);s.ap.gen+=gen;let cl=0,pr=0;
+  for(const c in s.classes){const a=Math.round(s.classes[c].lvl*s.classes[c].lvl*2);if(s.classes[c].lvl>1){s.ap.cls[c]=(s.ap.cls[c]||0)+a;cl+=a}}
+  for(const p in s.profs){const a=Math.round(s.profs[p].lvl*s.profs[p].lvl*2);if(s.profs[p].lvl>1){s.ap.prof[p]=(s.ap.prof[p]||0)+a;pr+=a}}
+  return {from:old,gen,cl,pr}}
+function loadFrom(json){const s=JSON.parse(json);deepFill(s,newState());G.migration=migrate(s);G.S=s;syncSlots();G.dirty=true;recalc();newHero();return s}
 function exportSave(){return btoa(unescape(encodeURIComponent(serialize())))}
 function importSave(str){const json=decodeURIComponent(escape(atob(str.trim())));loadFrom(json);save()}
 function snapshot(){const S=G.S;return {gold:S.gold,kills:S.stats.kills,lv:S.classes[S.cls].lvl,profs:D.PROF_ORDER.map(p=>S.profs[p].lvl),found:S.stats.found.slice(),relics:Object.keys(S.relics).length,zone:S.stats.everCleared,mats:Object.assign({},S.mats)}}
 function simulate(seconds,step=1){const fx=G.fx;G.fx=false;let t=0;while(t<seconds){const dt=Math.min(step,seconds-t);tick(dt);t+=dt;if(Math.floor(t)%30===0)checkAch()}G.fx=fx;G.ev.length=0;checkAch()}
 function offlineProgress(){const S=G.S;const el=Math.min(offlineCap(),(Date.now()-S.last)/1000);if(el<30)return null;const before=snapshot();const t0=performance.now();
-  simulate(el*gameSpeed(),el>7200?2:1);const after=snapshot();return {el,before,after,ms:performance.now()-t0}}
+  simulate(el*offlineRate(),el>7200?2:1);const after=snapshot();return {el,before,after,ms:performance.now()-t0}}
 
 if(typeof module!=='undefined')module.exports={G};
