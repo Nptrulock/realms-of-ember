@@ -29,3 +29,9 @@ A deep, deliberately grindy incremental idle RPG in an original high-fantasy set
 `sim.js` is a headless balance simulator:
 - `node sim.js class <id> <hours> [noap]`
 - `node sim.js prof <id> <hours> [noap]`
+
+## Navigation (v2.1, phone-first)
+- **Sticky header:** HP, current activity, and XP bars for your class and active profession. Each bar shows XP numbers, percent, and the estimated time to the next level.
+- **Main tabs:** a bottom tab bar on phones. Swipe left or right on the content to move between tabs. On desktop, use Shift+←/→.
+- **Professions, Classes and Mastery** show one page at a time. Swipe, tap ‹ ›, or tap a chip to jump. Swiping inside a pager moves the pager, not the tab.
+- **Battle scene:** while your hero works a profession, it collapses to a slim strip. Use ▾ Scene to expand it. The choice is remembered.

@@ -185,3 +185,61 @@ ul.small{padding-left:18px;margin:6px 0}ul.small li{margin:4px 0}
 .pscene.dancing,.pscene.bard{animation:sway 1s ease-in-out infinite}
 .pscene.advising,.pscene.fishing{animation:bob 2.2s ease-in-out infinite}
 @keyframes sway{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg) translateY(-6px)}}
+/* ---- v2.1 UI: HUD, pager, mobile nav, slim scene ---- */
+#top{flex-wrap:wrap;row-gap:5px}
+#hud{flex-basis:100%;display:grid;gap:4px;min-width:0}
+#hud:empty{display:none}
+.hrow{display:flex;align-items:center;gap:8px;min-width:0}
+.hrow .hl{flex:0 0 auto;width:150px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .hl .lv{color:var(--gold2);font-weight:800}
+.hrow .act{font-weight:700}
+.bar.hb{flex:1;height:17px;min-width:0}.bar.hb span{font-size:10.5px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+.pfill{background:linear-gradient(90deg,#1c7a5a,#46d3a0)}
+.bigxp .bar{height:24px;border-radius:12px}.bigxp .bar span{line-height:23px;font-size:12px}
+.ic.big{font-size:40px}
+#sceneBtn{position:absolute;top:8px;right:8px;z-index:9;background:#000a;border:1px solid var(--line);border-radius:8px;padding:3px 8px;font-size:12px;font-weight:700}
+#slim{display:none}
+#left.slim #slim{display:block;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+#left.slim #stage,#left.slim #heroBars,#left.slim #skillBar,#left.slim #zoneBar{display:none}
+#left.slim #slotsStrip{margin-top:6px}
+.slimrow{display:flex;align-items:center;gap:8px}.slimrow .sic{font-size:30px;animation:bob 2s ease-in-out infinite}.slimrow .sp{flex:1;min-width:0}
+.slimrow .small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+/* pager */
+.pager{touch-action:pan-y}
+.pgnav{display:flex;align-items:center;gap:8px}
+.pgnav .pgb{flex:0 0 auto;width:40px;height:40px;font-size:24px;line-height:1;padding:0;border-radius:50%}
+.pgtitle{flex:1;text-align:center;font-family:Cinzel,serif;font-weight:800;color:var(--gold2);font-size:16px;min-width:0}
+.pgtitle small{display:block;font-family:Inter;font-weight:600;font-size:10px;color:var(--dim)}
+.pgchips{display:flex;gap:5px;overflow-x:auto;padding:8px 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.pgchips::-webkit-scrollbar{display:none}
+.pgc{flex:0 0 auto;position:relative;background:#0007;border:1px solid var(--line);border-radius:10px;padding:3px 7px;font-size:17px;line-height:1.1;display:flex;flex-direction:column;align-items:center;min-width:42px}
+.pgc small{font-size:10px;font-weight:700;color:var(--dim)}
+.pgc.on{border-color:var(--gold);background:linear-gradient(180deg,#4a3410,#2a1d08)}.pgc.on small{color:var(--gold2)}
+.pgc .live{position:absolute;top:2px;right:3px;width:6px;height:6px;border-radius:50%;background:#46d38a;box-shadow:0 0 5px #46d38a}
+.slideL{animation:slideL .22s ease-out}.slideR{animation:slideR .22s ease-out}
+@keyframes slideL{from{transform:translateX(36px);opacity:.25}to{transform:none;opacity:1}}
+@keyframes slideR{from{transform:translateX(-36px);opacity:.25}to{transform:none;opacity:1}}
+#panel{touch-action:pan-y;overflow-x:hidden}
+#tabs .ti{margin-right:4px}
+@media (min-width:901px){#tabs{position:static}#panel{max-height:calc(100vh - 210px)}}
+@media (max-width:900px){
+  html,body{overflow-x:clip}
+  #app{padding:6px;padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+  #top{padding:6px 8px;border-radius:10px}
+  .logo{font-size:16px}
+  #res{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;gap:5px;scrollbar-width:none;min-width:0}
+  #res::-webkit-scrollbar{display:none}
+  .chip{padding:2px 8px;font-size:12px}
+  .hrow .hl{width:118px;font-size:11px}
+  #tabs{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:40;margin:0;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:#120d19f2;border-top:1px solid var(--line);backdrop-filter:blur(6px);gap:4px;scrollbar-width:none}
+  #tabs::-webkit-scrollbar{display:none}
+  #tabs button{display:flex;flex-direction:column;align-items:center;min-width:62px;padding:4px 6px;font-size:10.5px;border-radius:10px}
+  #tabs .ti{font-size:19px;margin:0;line-height:1.1}
+  #panel{min-height:60vh;padding:10px}
+  #stage{height:220px}
+  #toasts{bottom:calc(78px + env(safe-area-inset-bottom))}
+  #slotsStrip{grid-template-columns:1fr 1fr}
+  .slot{padding:6px 7px}.slot .a{font-size:12px}
+}
+#right{overflow-x:clip}
+#panel{overflow-x:clip}

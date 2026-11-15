@@ -61,7 +61,8 @@ function renderStage(){
     else if(!el.classList.contains('dying')){el.classList.add('dying');el.querySelector('.hpb i').style.width='0%';setTimeout(()=>{el.remove()},600)}
   });
   for(const [uid,el] of UI.enemyEls){if(!seen.has(uid)){if(!el.classList.contains('dying')){el.classList.add('dying');setTimeout(()=>el.remove(),600)}UI.enemyEls.delete(uid)}}
-  renderBars();
+  layoutScene(inCombat);
+  if(!document.getElementById('left').classList.contains('slim'))renderBars();
 }
 function renderBars(){
   const s=S(),cd=D.CLASSES[s.cls],h=G.h,d=G.d,cl=s.classes[s.cls];if(!h)return;
@@ -123,6 +124,47 @@ function profTarget(p){const s=S();switch(p){
 function plotsHtml(){const s=S(),hs=s.ps.herbalism;const n=plotsCount();let h='<div class="plots">';for(let i=0;i<n;i++){const p=hs.plots[i];
   if(!p){h+=`<div class="plot">🟫<small>empty</small></div>`;continue}const f=p.g/p.max;const st=f>=1?D.MATS[p.s].i:f>.6?'🌿':f>.25?'🌱':'🌰';
   h+=`<div class="plot ${p.gold?'gold':''}">${st}<small>${f>=1?'Ripe!':Math.ceil((p.max-p.g))+'s'}</small><div class="pb"><i style="width:${f*100}%"></i></div></div>`}return h+'</div>'}
+
+/* ---------------- HUD: always-visible HP + XP ---------------- */
+UI.xpS={};const CUMC={};
+function cumXp(kind,L){const k=kind;const a=CUMC[k]||(CUMC[k]=[0,0]);const need=kind==='cls'?xpNeed:profXpNeed;while(a.length<=L)a.push(a[a.length-1]+need(a.length-1));return a[L]}
+function sampleXp(){const s=S(),t=Date.now();const add=(key,kind,o)=>{const v=cumXp(kind,o.lvl)+o.xp;let arr=UI.xpS[key]||(UI.xpS[key]=[]);if(arr.length&&v<arr[arr.length-1][1])arr=UI.xpS[key]=[];arr.push([t,v]);while(arr.length>1&&t-arr[0][0]>180000)arr.shift()};
+  add('cls:'+s.cls,'cls',s.classes[s.cls]);if(s.cls2)add('cls:'+s.cls2,'cls',s.classes[s.cls2]);for(const q of D.PROF_ORDER)add('prof:'+q,'prof',s.profs[q])}
+function xpRate(key){const a=UI.xpS[key];if(!a||a.length<2)return 0;const [t0,v0]=a[0],[t1,v1]=a[a.length-1];if(t1-t0<8000)return 0;return (v1-v0)/((t1-t0)/1000)}
+function xpEta(key,short){const s=S();const [kind,id]=key.split(':');const o=kind==='cls'?s.classes[id]:s.profs[id];if(!o)return '';const r=xpRate(key);
+  if(r<=0)return short?'':'';const need=(kind==='cls'?xpNeed:profXpNeed)(o.lvl);const sec=(need-o.xp)/r;
+  return short?`~${fmtTime(sec)}`:`~${fmtTime(sec)} to Lv ${o.lvl+1} · ${fmt(r*3600)} XP/h`}
+function hudBar(icon,name,o,need,key,cls){const pct=Math.max(0,Math.min(1,o.xp/need));const eta=xpEta(key,true);
+  return `<div class="hrow"><span class="hl">${icon} <b>${name}</b> <span class="lv">Lv ${o.lvl}</span></span><div class="bar hb"><i class="${cls}" style="width:${pct*100}%"></i><span>${fmt(Math.floor(o.xp))} / ${fmt(need)} · ${(pct*100).toFixed(1)}%${eta?' · '+eta:''}</span></div></div>`}
+function renderHud(){const s=S(),h=G.h,d=G.d;if(!s.started||!h)return;const cd=D.CLASSES[s.cls],cl=s.classes[s.cls];const sl=s.slots[0];
+  const act=sl.act?(sl.act.type==='combat'?`⚔️ ${D.ZONES[s.zone].n}`:`${D.PROFS[sl.act.p].i} ${D.PROFS[sl.act.p].n}`):'💤 Idle';
+  const hp=`<div class="hrow"><span class="hl">❤️ <span class="act">${act}</span></span><div class="bar hb"><i class="hpfill" style="width:${h.dead?0:h.hp/d.maxHp*100}%"></i><span>${h.dead?'💀 Reviving '+Math.ceil(h.reviveT)+'s':`${fmt(h.hp)} / ${fmt(d.maxHp)} HP`}</span></div></div>`;
+  let pq=sl.act&&sl.act.type==='prof'?sl.act.p:(UI.tab==='profs'?UI.profSel:null);
+  const prof=pq?hudBar(D.PROFS[pq].i,D.PROFS[pq].n,s.profs[pq],profXpNeed(s.profs[pq].lvl),'prof:'+pq,'pfill'):'';
+  const cls=hudBar(cd.i,cd.n,cl,xpNeed(cl.lvl),'cls:'+s.cls,'xpfill');
+  setHTML($('#hud'),hp+(sl.act&&sl.act.type==='prof'?prof+cls:cls+prof))}
+
+/* ---------------- battle scene collapse (profession mode) ---------------- */
+function layoutScene(inCombat){const s=S(),left=$('#left');const slim=!inCombat&&!s.settings.sceneOpen;left.classList.toggle('slim',slim);
+  const sb=$('#sceneBtn');sb.style.display=inCombat?'none':'';sb.textContent='▴ Collapse';
+  if(slim){const sl=s.slots[0],p=sl.act&&sl.act.p;const pd=p?D.PROFS[p]:null;
+    setHTML($('#slim'),`<div class="slimrow"><span class="sic">${pd?pd.i:'🏕️'}</span><div class="sp"><div class="small"><b>${pd?pd.n:'Resting'}</b>${p?' — '+profTarget(p):''}${sl.note?` <span style="color:#ff8a8a">· ${sl.note}</span>`:''}</div><div class="bar thin"><i class="kfill" id="slimProg" style="width:0%"></i></div></div>${btn('sceneToggle','▾ Scene',{cls:'sm'})}${btn('goFight','⚔️ Fight',{cls:'sm'})}</div>`);
+    const pb=document.getElementById('slimProg');if(pb&&p){const v=p==='smithing'?Math.min(1,sl.heat/s.ps.smithing.target):p==='herbalism'?0:(sl.prog||0);pb.style.width=(v*100)+'%'}}}
+
+/* ---------------- swipe: carousel first, then main tabs ---------------- */
+(function(){let sx=0,sy=0,st=0,tgt=null,active=false,swiped=false;
+  const start=(x,y,t)=>{if(t&&t.closest&&t.closest('input,select,textarea,.pgchips,#tabs'))return;sx=x;sy=y;st=Date.now();tgt=t;active=true};
+  const end=(x,y)=>{if(!active)return;active=false;const dx=x-sx,dy=y-sy;if(Math.abs(dx)<55||Math.abs(dy)>Math.abs(dx)*.6||Date.now()-st>900)return;
+    swiped=true;setTimeout(()=>swiped=false,350);const dir=dx<0?1:-1;const pg=tgt&&tgt.closest&&tgt.closest('.pager');
+    if(pg){pagerStep(pg.dataset.pager,dir);renderPanel(true)}else stepTab(dir)};
+  const pn=()=>document.getElementById('panel');
+  document.addEventListener('touchstart',e=>{if(!pn().contains(e.target)||e.touches.length>1)return;const t=e.touches[0];start(t.clientX,t.clientY,e.target)},{passive:true});
+  document.addEventListener('touchend',e=>{const t=e.changedTouches[0];if(t)end(t.clientX,t.clientY)},{passive:true});
+  document.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||!pn().contains(e.target))return;start(e.clientX,e.clientY,e.target)});
+  document.addEventListener('pointerup',e=>{if(e.pointerType==='mouse')end(e.clientX,e.clientY)});
+  document.addEventListener('click',e=>{if(swiped){e.stopPropagation();e.preventDefault()}},true);
+  document.addEventListener('keydown',e=>{if(e.target.closest&&e.target.closest('input,textarea,select'))return;if(e.key==='ArrowRight'||e.key==='ArrowLeft'){const d=e.key==='ArrowRight'?1:-1;if(e.shiftKey)stepTab(d);else{const pg=document.querySelector('#panel .pager');if(pg){pagerStep(pg.dataset.pager,d);renderPanel(true)}else stepTab(d)}}});
+})();
 
 /* ---------------- FX ---------------- */
 const fxc=()=>$('#fx');let fctx=null;
@@ -222,19 +264,37 @@ P.skills=()=>{const s=S(),cd=D.CLASSES[s.cls],cl=s.classes[s.cls];
   <h3>Abilities (auto-cast in order)</h3><div class="grid">${cd.skills.map(x=>card(x,1)).join('')}</div>
   <h3>Passives</h3><div class="grid">${cd.passives.map(x=>card(x,0)).join('')}</div>
   <h3>Subclass</h3>${sub}`;};
-P.classes=()=>{const s=S();const can2=Object.values(s.classes).some(c=>c.lvl>=D.MULTI_LEVEL);
-  return `<h2>🎭 Classes</h2><p class="muted">Each class levels separately and keeps its skills. Switching is free. ${can2?'<b>Multiclassing unlocked:</b> your secondary class grants 50% of its passives and 25% of its attribute growth, and earns 25% of your XP.':`Reach level ${D.MULTI_LEVEL} in any class to unlock multiclassing.`}</p>
-  <div class="grid" style="--min:240px">${D.CLASS_ORDER.map(c=>{const cd=D.CLASSES[c],cl=s.classes[c],un=s.unlockedCls[c];
-   return `<div class="card cls ${un?'':'locked'} ${s.cls===c?'sel':''}"><div class="hd"><span class="ic">${cd.i}${cd.w}</span><div><b class="cinzel">${cd.n}</b><div class="small">Level ${cl.lvl} · ${cd.res.n} · ★${D.STAT_SHORT[cd.main]}${cl.sub?' · '+cd.subs.find(x=>x.id===cl.sub).n:''}</div></div></div>
-   <div class="small" style="margin:6px 0">${cd.mech}</div>
-   ${un?`<div class="row">${s.cls===c?'<span class="pill">Active</span>':btn('switchCls','Play as '+cd.n,{data:{c},cls:'gold sm'})}${can2&&s.cls!==c?btn('cls2',s.cls2===c?'✅ Secondary':'Set secondary',{data:{c},cls:'sm'}):''}</div>`:`<div class="small">🔒 ${D.CLASS_UNLOCK[c].d}</div>`}</div>`}).join('')}</div>`;};
-P.profs=()=>{const s=S(),p=UI.profSel,pd=D.PROFS[p],pr=s.profs[p];const info=actionSlotsInfo();
-  let h=`<h2>⚒️ Professions</h2><div class="grid" style="--min:150px">${D.PROF_ORDER.map(q=>{const x=s.profs[q];const who=s.slots.map((sl,i)=>sl.act&&sl.act.p===q?(i?'🧑‍🔧':'🧝'):'').join('');return `<div class="card ${q===p?'sel':''}" data-a="profSel" data-p="${q}" style="cursor:pointer"><div class="hd"><span class="ic">${D.PROFS[q].i}</span><div class="sp"><b>${D.PROFS[q].n}</b><div class="small">Lv ${x.lvl} ${who}</div></div></div>${bar(x.xp/profXpNeed(x.lvl),'xpfill')}</div>`}).join('')}</div>`;
-  h+=`<div class="card" style="margin-top:10px"><div class="hd"><span class="ic">${pd.i}</span><div class="sp"><b class="cinzel">${pd.n}</b> — Level ${pr.lvl} <span class="muted">(${fmt(pr.xp)}/${fmt(profXpNeed(pr.lvl))} xp)</span><div class="small">${pd.mech}</div></div></div>
+/* ---------- pager (one page at a time, swipe / arrows / chips) ---------- */
+const PAGERS={
+  profs:{keys:()=>D.PROF_ORDER,get:()=>UI.profSel,set:k=>{UI.profSel=k},chip:k=>{const s=S();const who=s.slots.some(sl=>sl.act&&sl.act.p===k);return `${D.PROFS[k].i}<small>${s.profs[k].lvl}</small>${who?'<i class="live"></i>':''}`}},
+  classes:{keys:()=>D.CLASS_ORDER,get:()=>UI.clsSel||S().cls,set:k=>{UI.clsSel=k},chip:k=>{const s=S();return `${D.CLASSES[k].i}<small>${s.unlockedCls[k]?s.classes[k].lvl:'🔒'}</small>${s.cls===k?'<i class="live"></i>':''}`}},
+  mastery:{keys:()=>['daily','gen','cls',...D.PROF_ORDER.map(q=>'p:'+q)],get:()=>UI.mPage||'daily',set:k=>{UI.mPage=k},
+    chip:k=>{const s=S();if(k==='daily')return '📅<small>Daily</small>';if(k==='gen')return `🌐<small>${fmt(Math.floor(s.ap.gen))}</small>`;if(k==='cls')return `${D.CLASSES[s.cls].i}<small>${fmt(Math.floor(s.ap.cls[s.cls]||0))}</small>`;const q=k.slice(2);return `${D.PROFS[q].i}<small>${fmt(Math.floor(s.ap.prof[q]||0))}</small>`}},
+};
+function pagerStep(id,d){const P2=PAGERS[id],ks=P2.keys();let i=ks.indexOf(P2.get());if(i<0)i=0;i=(i+d+ks.length)%ks.length;P2.set(ks[i]);UI.slide=d>0?'slideL':'slideR'}
+function pager(id,title,body){const P2=PAGERS[id],ks=P2.keys(),cur=P2.get(),i=Math.max(0,ks.indexOf(cur));const sl=UI.slide||'';
+  return `<div class="pager" data-pager="${id}"><div class="pgnav">${btn('pg','‹',{data:{pg:id,d:-1},cls:'pgb'})}<div class="pgtitle">${title}<small>${i+1} / ${ks.length} · swipe ⇆</small></div>${btn('pg','›',{data:{pg:id,d:1},cls:'pgb'})}</div>
+   <div class="pgchips">${ks.map(k=>`<button class="pgc ${k===cur?'on':''}" data-a="pgTo" data-pg="${id}" data-k="${k}">${P2.chip(k)}</button>`).join('')}</div>
+   <div class="pgbody ${sl}">${body}</div></div>`}
+function bigXp(cur,need,cls,label){const pct=need?cur/need:0;return `<div class="bigxp">${bar(pct,cls||'xpfill',`${label?label+' · ':''}${fmt(Math.floor(cur))} / ${fmt(need)} XP · ${(pct*100).toFixed(1)}%`)}</div>`}
+P.classes=()=>{const s=S();const can2=Object.values(s.classes).some(c=>c.lvl>=D.MULTI_LEVEL);const c=PAGERS.classes.get();const cd=D.CLASSES[c],cl=s.classes[c],un=s.unlockedCls[c];
+  const eta=xpEta('cls:'+c);
+  const body=`<div class="card cls ${un?'':'locked'} ${s.cls===c?'sel':''}"><div class="hd"><span class="ic big">${cd.i}${cd.w}</span><div class="sp"><b class="cinzel" style="font-size:17px">${cd.n}</b><div class="small">Level <b>${cl.lvl}</b> · ${cd.res.n} · ★${D.STAT_SHORT[cd.main]}${cl.sub?' · '+cd.subs.find(x=>x.id===cl.sub).n:''}</div></div></div>
+   ${bigXp(cl.xp,xpNeed(cl.lvl),'xpfill','Lv '+cl.lvl)}${eta?`<div class="small muted">⏱ ${eta}</div>`:''}
+   <div class="small" style="margin:8px 0">${cd.mech}</div>
+   ${un?`<div class="row">${s.cls===c?'<span class="pill">✅ Active class</span>':btn('switchCls','Play as '+cd.n,{data:{c},cls:'gold'})}${can2&&s.cls!==c?btn('cls2',s.cls2===c?'✅ Secondary':'Set secondary',{data:{c},cls:'sm'}):''}${s.cls===c?btn('tab','✨ Skills →',{data:{t:'skills'},cls:'sm'}):''}</div>
+     <div class="small" style="margin-top:8px">🎖️ ${cd.n} AP: <b>${fmt(Math.floor(s.ap.cls[c]||0))}</b> · Subclasses: ${cd.subs.map(x=>x.i+' '+x.n).join(' / ')}</div>`:`<div class="small">🔒 ${D.CLASS_UNLOCK[c].d}</div>`}</div>`;
+  return `<h2>🎭 Classes</h2>${pager('classes',`${cd.i} ${cd.n}`,body)}<p class="small muted">Each class levels separately and keeps its skills. Switching is free. ${can2?'<b>Multiclassing unlocked:</b> your secondary class grants 50% of its passives and 25% of its attribute growth, and earns 25% of your XP.':`Reach level ${D.MULTI_LEVEL} in any class to unlock multiclassing.`}</p>`;};
+P.profs=()=>{const s=S(),p=UI.profSel,pd=D.PROFS[p],pr=s.profs[p];const info=actionSlotsInfo();const eta=xpEta('prof:'+p);
+  const who=s.slots.map((sl,i)=>sl.act&&sl.act.p===p?(i?'🧑‍🔧 '+info[i].n:'🧝 Hero'):'').filter(Boolean).join(', ');
+  let body=`<div class="card"><div class="hd"><span class="ic big">${pd.i}</span><div class="sp"><b class="cinzel" style="font-size:17px">${pd.n}</b> <span class="pill">Lv ${pr.lvl}</span><div class="small">${who?'Working: '+who:'<span class="muted">Nobody assigned</span>'}</div></div></div>
+   ${bigXp(pr.xp,profXpNeed(pr.lvl),'xpfill','Lv '+pr.lvl)}${eta?`<div class="small muted">⏱ ${eta}</div>`:''}
+   <div class="small" style="margin-top:6px">${pd.mech}</div>
    <div class="row" style="margin-top:6px">Assign: ${s.slots.map((sl,i)=>btn('assign',(i?'🧑‍🔧 '+info[i].n:'🧝 Hero')+(sl.act&&sl.act.p===p?' ✅':''),{data:{si:i,k:p},cls:'sm'+(sl.act&&sl.act.p===p?' on':'')})).join('')}</div>
-   <div class="row small" style="margin-top:6px">🎖️ ${pd.n} AP: <b>${fmt(Math.floor(s.ap.prof[p]||0))}</b> ${btn('goMastery','Spend in Mastery →',{data:{p},cls:'sm'})}<span class="muted">Speed ×${profSpeed(0,p).toFixed(2)} (hero) · bonus yield ${((G.d.bounty||0)+pm(p,'bounty')*3).toFixed(0)}%</span></div>
+   <div class="row small" style="margin-top:6px">🎖️ AP: <b>${fmt(Math.floor(s.ap.prof[p]||0))}</b> ${btn('goMastery','Mastery →',{data:{p},cls:'sm gold'})}<span class="muted">Speed ×${profSpeed(0,p).toFixed(2)} (hero) · bonus yield ${((G.d.bounty||0)+pm(p,'bounty')*3).toFixed(0)}%</span></div>
    <div class="row small" style="margin-top:6px">🔧 Tools: ${D.TOOLS.names[s.tools[p]||0]} (+${15*(s.tools[p]||0)}% speed) ${(s.tools[p]||0)<D.TOOLS.max?btn('tool',`Upgrade ${costTxt(townCost(upgradeCost(D.TOOLS.base,D.TOOLS.mult,s.tools[p]||0)))}`,{data:{p},cls:'sm'}):''}</div></div>`;
-  h+=profDetail(p);return h;};
+  body+=profDetail(p);
+  return `<h2>⚒️ Professions</h2>${pager('profs',`${pd.i} ${pd.n} · Lv ${pr.lvl}`,body)}`;};
 const MODN={dmgPct:'damage',regenPct:'HP regen/s',hpPct:'max HP',profSpeed:'profession speed',xp:'XP',profXp:'profession XP',crit:'crit'};
 function profDetail2(p,lv){const s=S();let h='';const t=(x)=>`Lv ${x.lv} · ${x.t}s · ${succ(p,x.lv)}`;
   if(p==='summoning'){const ss=s.ps.summoning,cap=summonCap();
@@ -284,18 +344,19 @@ function profDetail(p){const s=S(),lv=s.profs[p].lvl;let h='';
 function mNode(tree,key,n,ranks,pool){const r=(ranks||{})[n.id]||0,mx=r>=n.max,c=mx?0:masteryCost(n,r);
   return `<div class="card mnode ${mx?'sel':''}"><div class="hd"><span class="ic">${n.i||'⭐'}</span><div class="sp"><b>${n.n}</b> <span class="pill">${r}/${n.max}</span><div class="small">${r?n.d(r):n.d(1)}${!mx&&r?`<br><span class="muted">Next: ${n.d(r+1)}</span>`:''}</div></div></div>
    <div style="margin-top:4px">${mx?'<span class="pill">Mastered</span>':btn('buyM',`🎖️ ${fmt(c)} AP`,{data:{tree,key:key||'',id:n.id},cls:'gold sm',dis:pool<c})}</div></div>`}
-P.mastery=()=>{const s=S(),d=G.d;const dc=dailyCap();const cd=D.CLASSES[s.cls];const mp=UI.mProf||UI.profSel||'mining';
-  const deeds=(s.deeds.list||[]).map(dd=>`<div class="card ${dd.done?'sel':''}"><b>${dd.done?'✅':'📜'} ${deedText(dd)}</b><div class="small">${fmt(Math.min(dd.prog,dd.n))}/${fmt(dd.n)} · reward +${30+5*Math.min(7,s.daily.streak||1)} general AP & gold</div>${bar(dd.prog/dd.n,'xpfill')}</div>`).join('');
-  const sig=Object.assign({id:'sig',i:cd.i,base:15,mult:1.25,max:20},cd.apNode);
-  return `<h2>🎖️ Mastery</h2>
-  <p class="small">Every action earns <b>Action Points</b>: kills fill your <b>class</b> pool, profession actions fill that <b>profession's</b> pool, and everything trickles into the <b>general</b> pool. Masteries are <b>permanent</b> — they survive Ascension — and each rank costs more than the last. AP bonus: <b>+${fmt(d.apPct||0)}%</b>${d.profApPct?` · profession AP +${fmt(d.profApPct)}%`:''}. Offline efficiency: <b>${Math.round(offlineRate()*100)}%</b>.</p>
-  <div class="grid" style="--min:230px"><div class="card"><h3 style="margin-top:0">📅 Daily</h3><div class="small">Streak <b>${s.daily.streak||0}</b> day${s.daily.streak===1?'':'s'} 🔥 · first <b>${dc}</b> actions each day earn <b>double AP</b>: ${fmt(Math.min(dc,s.daily.count||0))}/${dc} used</div>${bar(Math.min(1,(s.daily.count||0)/dc),'kfill')}<div class="small muted">New day = +${10*Math.min(7,(s.daily.streak||0)+1)} general AP (grows with streak, max 70) and 3 new deeds.</div></div>
-  <div class="card"><h3 style="margin-top:0">🎖️ Balances</h3><div class="small">General: <b>${fmt(Math.floor(s.ap.gen))}</b><br>${cd.i} ${cd.n}: <b>${fmt(Math.floor(s.ap.cls[s.cls]||0))}</b><br>${D.PROF_ORDER.filter(q=>(s.ap.prof[q]||0)>=1).map(q=>`${D.PROFS[q].i} ${fmt(Math.floor(s.ap.prof[q]))}`).join(' · ')||'<span class="muted">No profession AP yet</span>'}<br><span class="muted">Lifetime earned ${fmt(Math.floor(s.stats.apEarned||0))} · spent ${fmt(s.stats.apSpent||0)}</span></div></div></div>
-  <h3>📜 Today's deeds</h3><div class="grid" style="--min:220px">${deeds||'<span class="muted">Deeds arrive at the start of each day.</span>'}</div>
-  <h3>🌐 General mastery <span class="muted">— ${fmt(Math.floor(s.ap.gen))} AP</span></h3><div class="grid" style="--min:230px">${D.AP_GEN.map(n=>mNode('gen',null,n,s.mastery.gen,s.ap.gen)).join('')}</div>
-  <h3>${cd.i} ${cd.n} mastery <span class="muted">— ${fmt(Math.floor(s.ap.cls[s.cls]||0))} AP (switch class to train another tree)</span></h3><div class="grid" style="--min:230px">${mNode('cls',s.cls,sig,s.mastery.cls[s.cls],s.ap.cls[s.cls]||0)}${D.AP_CLASS.map(n=>mNode('cls',s.cls,n,s.mastery.cls[s.cls],s.ap.cls[s.cls]||0)).join('')}</div>
-  <h3>⚒️ Profession mastery</h3><div class="row">${D.PROF_ORDER.map(q=>btn('mProf',`${D.PROFS[q].i} ${fmt(Math.floor(s.ap.prof[q]||0))}`,{data:{p:q},cls:'sm'+(q===mp?' on':'')})).join('')}</div>
-  <h3>${D.PROFS[mp].i} ${D.PROFS[mp].n} <span class="muted">— ${fmt(Math.floor(s.ap.prof[mp]||0))} AP</span></h3><div class="grid" style="--min:230px">${D.AP_PROF.map(n=>mNode('prof',mp,n,s.mastery.prof[mp],s.ap.prof[mp]||0)).join('')}</div>`};
+P.mastery=()=>{const s=S(),d=G.d;const dc=dailyCap();const cd=D.CLASSES[s.cls];const k=PAGERS.mastery.get();let title='',body='';
+  if(k==='daily'){const deeds=(s.deeds.list||[]).map(dd=>`<div class="card ${dd.done?'sel':''}"><b>${dd.done?'✅':'📜'} ${deedText(dd)}</b><div class="small">${fmt(Math.min(dd.prog,dd.n))}/${fmt(dd.n)} · reward +${30+5*Math.min(7,s.daily.streak||1)} general AP & gold</div>${bar(dd.prog/dd.n,'xpfill')}</div>`).join('');
+    title='📅 Daily & balances';
+    body=`<p class="small">Every action earns <b>Action Points</b>: kills fill your <b>class</b> pool, profession actions fill that <b>profession's</b> pool, and everything trickles into the <b>general</b> pool. Masteries are <b>permanent</b> (they survive Ascension) and each rank costs more. AP bonus <b>+${fmt(d.apPct||0)}%</b>${d.profApPct?` · profession AP +${fmt(d.profApPct)}%`:''} · offline efficiency <b>${Math.round(offlineRate()*100)}%</b>.</p>
+    <div class="grid" style="--min:230px"><div class="card"><h3 style="margin-top:0">📅 Daily</h3><div class="small">Streak <b>${s.daily.streak||0}</b> 🔥 · first <b>${dc}</b> actions each day earn <b>double AP</b>: ${fmt(Math.min(dc,s.daily.count||0))}/${dc} used</div>${bar(Math.min(1,(s.daily.count||0)/dc),'kfill')}<div class="small muted">New day = +${10*Math.min(7,(s.daily.streak||0)+1)} general AP (max 70) and 3 new deeds.</div></div>
+    <div class="card"><h3 style="margin-top:0">🎖️ Balances</h3><div class="small">General: <b>${fmt(Math.floor(s.ap.gen))}</b><br>${cd.i} ${cd.n}: <b>${fmt(Math.floor(s.ap.cls[s.cls]||0))}</b><br>${D.PROF_ORDER.filter(q=>(s.ap.prof[q]||0)>=1).map(q=>`${D.PROFS[q].i} ${fmt(Math.floor(s.ap.prof[q]))}`).join(' · ')||'<span class="muted">No profession AP yet</span>'}<br><span class="muted">Lifetime earned ${fmt(Math.floor(s.stats.apEarned||0))} · spent ${fmt(s.stats.apSpent||0)}</span></div></div></div>
+    <h3>📜 Today's deeds</h3><div class="grid" style="--min:220px">${deeds||'<span class="muted">Deeds arrive at the start of each day.</span>'}</div>`}
+  else if(k==='gen'){title=`🌐 General · ${fmt(Math.floor(s.ap.gen))} AP`;body=`<div class="grid" style="--min:230px">${D.AP_GEN.map(n=>mNode('gen',null,n,s.mastery.gen,s.ap.gen)).join('')}</div>`}
+  else if(k==='cls'){const sig=Object.assign({id:'sig',i:cd.i,base:15,mult:1.25,max:20},cd.apNode);title=`${cd.i} ${cd.n} · ${fmt(Math.floor(s.ap.cls[s.cls]||0))} AP`;
+    body=`<p class="small muted">Class mastery is per class. Switch class to train another tree.</p><div class="grid" style="--min:230px">${mNode('cls',s.cls,sig,s.mastery.cls[s.cls],s.ap.cls[s.cls]||0)}${D.AP_CLASS.map(n=>mNode('cls',s.cls,n,s.mastery.cls[s.cls],s.ap.cls[s.cls]||0)).join('')}</div>`}
+  else{const q=k.slice(2);title=`${D.PROFS[q].i} ${D.PROFS[q].n} · ${fmt(Math.floor(s.ap.prof[q]||0))} AP`;
+    body=`<div class="row small" style="margin-bottom:6px">Level ${s.profs[q].lvl} ${btn('goProf','Open profession →',{data:{p:q},cls:'sm'})}</div><div class="grid" style="--min:230px">${D.AP_PROF.map(n=>mNode('prof',q,n,s.mastery.prof[q],s.ap.prof[q]||0)).join('')}</div>`}
+  return `<h2>🎖️ Mastery</h2>${pager('mastery',title,body)}`};
 P.inv=()=>{const s=S();const items=s.inv.slice().sort((a,b)=>UI.invSort==='r'?(b.r-a.r||b.il-a.il):UI.invSort==='il'?(b.il-a.il):D.SLOTS.indexOf(a.slot)-D.SLOTS.indexOf(b.slot));
   const tiles=items.map(it=>`<div class="item ${isUpgradeCached(it)?'up':''}" style="--rc:${D.RARITIES[it.r].color}" data-a="item" data-id="${it.id}"><div class="ii">${itemIcon(it)}</div><div class="small r${it.r}" style="font-size:10px">${D.RARITIES[it.r].name}</div><div class="il">${D.SLOT_NAME[it.slot]} · il ${it.il}</div>${it.ench?`<span class="en">+${it.ench}</span>`:''}${s.locked[it.id]?'<span class="lk">🔒</span>':''}</div>`).join('');
   const mats=Object.keys(D.MATS).filter(k=>(s.mats[k]||0)>0).map(k=>`<span class="pill">${D.MATS[k].i} ${D.MATS[k].n} <b>${fmt(s.mats[k])}</b></span>`).join(' ');
@@ -349,13 +410,19 @@ P.settings=()=>{const s=S(),st=s.settings;
   <div class="row">${btn('saveNow','💾 Save now')}${btn('export','📤 Export')}${btn('import','📥 Import')}${btn('rename','✏️ Rename hero')}<span class="sp"></span>${btn('hardReset','🗑️ Hard reset',{cls:'red'})}</div>
   <p class="muted" style="margin-top:14px">Realms of Ember · original fantasy setting · made for Noah.</p>`};
 
-function renderTabs(){const s=S();const pts=s.classes[s.cls].pts>0;setHTML($('#tabs'),TABS.map(([k,l])=>`<button data-a="tab" data-t="${k}" class="${UI.tab===k?'on':''}">${l}${k==='skills'&&pts?'<span class="dot"></span>':''}</button>`).join(''))}
+function renderTabs(){const s=S();const pts=s.classes[s.cls].pts>0;const tb=$('#tabs');const before=tb._h;const setT=(el,h)=>{if(el._h!==h){el._h=h;el.innerHTML=h}};setT(tb,TABS.map(([k,l])=>{const [ic,...rest]=l.split(' ');return `<button data-a="tab" data-t="${k}" class="${UI.tab===k?'on':''}"><span class="ti">${ic}</span><span class="tl">${rest.join(' ')||'Settings'}</span>${k==='skills'&&pts?'<span class="dot"></span>':''}</button>`}).join(''));
+  if(tb._h!==before){centerIn(tb,tb.querySelector('button.on'))}}
+function centerIn(box,el){if(!box||!el)return;const br=box.getBoundingClientRect(),er=el.getBoundingClientRect();box.scrollLeft+=(er.left-br.left)-(box.clientWidth-er.width)/2}
+function goTab(t,dir){const i0=TABS.findIndex(x=>x[0]===UI.tab),i1=TABS.findIndex(x=>x[0]===t);UI.mainSlide=dir||(i1>=i0?'slideL':'slideR');UI.slide=null;UI.tab=t;const pn=$('#panel');pn.scrollTop=0;renderPanel(true);
+  pn.classList.remove('slideL','slideR');void pn.offsetWidth;pn.classList.add(UI.mainSlide);
+  if(window.innerWidth<=900){const r=$('#right');const y=r.getBoundingClientRect().top+window.scrollY-$('#top').offsetHeight-4;if(window.scrollY>y||r.getBoundingClientRect().top>window.innerHeight*.6)window.scrollTo({top:Math.max(0,y),behavior:'smooth'})}}
+function stepTab(d){const i=TABS.findIndex(x=>x[0]===UI.tab);const n=TABS[(i+d+TABS.length)%TABS.length][0];goTab(n,d>0?'slideL':'slideR')}
 function renderPanel(force){const pn=$('#panel');if(!force&&(UI.busyInput||pn.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName)))return;
-  const st=pn.scrollTop;if(force)pn._h=null;const h=P[UI.tab]();if(force||(!UI.ptrDown&&pn._h!==h)){pn._h=h;pn.innerHTML=h}pn.scrollTop=st;UI.lastPanel=performance.now();renderTabs()}
+  const st=pn.scrollTop;if(force)pn._h=null;const h=P[UI.tab]();if(force||(!UI.ptrDown&&pn._h!==h)){pn._h=h;pn.innerHTML=h}pn.scrollTop=st;UI.lastPanel=performance.now();if(force){const cc=pn.querySelector('.pgchips');if(cc)centerIn(cc,cc.querySelector('.pgc.on'))}if(UI.slide&&force){UI.slide=null;centerIn(pn.querySelector('.pgchips'),pn.querySelector('.pgc.on'))}renderTabs()}
 
 /* ---------------- actions ---------------- */
 const A={
-  tab:e=>{UI.tab=e.t;$('#panel').scrollTop=0;renderPanel(true)},
+  tab:e=>goTab(e.t),
   pickStart:e=>{const s=S();s.name=($('#heroName').value||'Hero').slice(0,18);s.cls=e.c;s.started=true;giveStarter();recalc();newHero();closeModal();log(`⚔️ ${esc(s.name)} the ${D.CLASSES[e.c].n} sets out from Emberhold.`,'level');save();renderPanel(true)},
   zone:e=>{const s=S();setZone(+e.i);if(!s.slots[0].act||s.slots[0].act.type!=='combat')assign(0,{type:'combat'})},
   boss:()=>{S().bossReq=true;S().bossRetry=0},
@@ -372,7 +439,9 @@ const A={
   setPet:e=>{S().ps.advising.target=e.id},setSong:e=>{S().ps.bard.target=e.id},setAnthem:e=>{S().ps.bard.anthem=e.id;G.dirty=true},setFish:e=>{S().ps.fishing.target=e.id},
   releaseSum:e=>{const s=S();if(confirm('Release this creature?')){s.summons=s.summons.filter(x=>x.uid!=e.uid);G.dirty=true}},
   buyM:e=>{if(!buyMastery(e.tree,e.key||null,e.id))toast('Not enough AP')},
-  mProf:e=>{UI.mProf=e.p},goMastery:e=>{UI.mProf=e.p;UI.tab='mastery';$('#panel').scrollTop=0},
+  mProf:e=>{UI.mPage='p:'+e.p},goMastery:e=>{UI.mPage='p:'+e.p;goTab('mastery')},goProf:e=>{UI.profSel=e.p;goTab('profs')},
+  pg:e=>pagerStep(e.pg,+e.d),pgTo:e=>{const P2=PAGERS[e.pg],ks=P2.keys();UI.slide=ks.indexOf(e.k)>=ks.indexOf(P2.get())?'slideL':'slideR';P2.set(e.k)},
+  sceneToggle:()=>{const st=S().settings;st.sceneOpen=!st.sceneOpen;layoutScene()},
   skillUp:e=>spendPoint(e.id),
   toggleSkill:e=>{const cl=S().classes[S().cls];cl.off[e.id]=!cl.off[e.id]},
   respec:()=>{if(confirm('Refund all skill points for this class?'))respec()},
@@ -413,11 +482,12 @@ let lastT=performance.now(),acc=0,lastSave=Date.now(),lastAch=0,lastStrip=0;
 function frame(now){
   let dt=(now-lastT)/1000;lastT=now;
   if(S().started){
-    if(dt>5){const r=catchUp(dt);if(r)showOffline(r);dt=0}
+    if(dt>5){const r=catchUp(dt);if(r)showOffline(r);dt=0;UI.xpS={}}
     let sim=Math.min(dt,1)*gameSpeed();while(sim>0){const st=Math.min(.05,sim);tick(st);sim-=st}
     if(now-lastAch>2000){lastAch=now;checkAch();checkClassUnlocks()}
     renderStage();processEvents();drawFx(Math.min(dt,.05));
-    if(now-lastStrip>250){lastStrip=now;renderTop();renderSlots()}
+    if(now-lastStrip>250){lastStrip=now;renderTop();renderSlots();renderHud()}
+    if(now-(UI.lastXs||0)>1000){UI.lastXs=now;sampleXp()}
     if(now-UI.lastPanel>1000)renderPanel(false);
     if(Date.now()-lastSave>10000){lastSave=Date.now();save()}
   }
