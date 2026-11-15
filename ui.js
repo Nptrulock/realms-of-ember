@@ -128,7 +128,7 @@ function plotsHtml(){const s=S(),hs=s.ps.herbalism;const n=plotsCount();let h='<
 /* ---------------- HUD: always-visible HP + XP ---------------- */
 UI.xpS={};const CUMC={};
 function cumXp(kind,L){const k=kind;const a=CUMC[k]||(CUMC[k]=[0,0]);const need=kind==='cls'?xpNeed:profXpNeed;while(a.length<=L)a.push(a[a.length-1]+need(a.length-1));return a[L]}
-function sampleXp(){const s=S(),t=Date.now();const add=(key,kind,o)=>{const v=cumXp(kind,o.lvl)+o.xp;let arr=UI.xpS[key]||(UI.xpS[key]=[]);if(arr.length&&v<arr[arr.length-1][1])arr=UI.xpS[key]=[];arr.push([t,v]);while(arr.length>1&&t-arr[0][0]>180000)arr.shift()};
+function sampleXp(){const s=S(),t=Date.now();const add=(key,kind,o)=>{const v=cumXp(kind,o.lvl)+o.xp;let arr=UI.xpS[key]||(UI.xpS[key]=[]);const lst=arr[arr.length-1];if(lst&&(v<lst[1]||o.lvl-lst[2]>2))arr=UI.xpS[key]=[];arr.push([t,v,o.lvl]);while(arr.length>1&&t-arr[0][0]>180000)arr.shift()};
   add('cls:'+s.cls,'cls',s.classes[s.cls]);if(s.cls2)add('cls:'+s.cls2,'cls',s.classes[s.cls2]);for(const q of D.PROF_ORDER)add('prof:'+q,'prof',s.profs[q])}
 function xpRate(key){const a=UI.xpS[key];if(!a||a.length<2)return 0;const [t0,v0]=a[0],[t1,v1]=a[a.length-1];if(t1-t0<8000)return 0;return (v1-v0)/((t1-t0)/1000)}
 function xpEta(key,short){const s=S();const [kind,id]=key.split(':');const o=kind==='cls'?s.classes[id]:s.profs[id];if(!o)return '';const r=xpRate(key);
