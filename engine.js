@@ -68,7 +68,7 @@ function syncSlots(){const n=actionSlotsInfo().length;const S=G.S;while(S.slots.
 function speedOptions(){return [1]}
 function gameSpeed(){return 1}
 function offlineCap(){const S=G.S;return (S.qol.hourglass2?43200:S.qol.hourglass1?21600:7200)+(star('t2')?14400:0)+(star('tc')?21600:0)}
-function offlineRate(){const S=G.S;return Math.min(.75,.2+.02*((S.mastery&&S.mastery.gen.vigil)||0)+(S.relics.hourglass?.1:0)+(star('t1')?.05:0)+(star('tc')?.1:0))}
+function offlineRate(){const S=G.S;return Math.min(.6,.2+.02*((S.mastery&&S.mastery.gen.vigil)||0)+(S.relics.hourglass?.1:0))+(star('t1')?.05:0)+(star('tc')?.1:0)}
 function plotsCount(){const S=G.S;return 3+(S.plotsBought||0)+Math.floor(S.profs.herbalism.lvl/20)+(star('g3')?1:0)}
 function invCap(){return 30+10*(G.S.satchel||0)+(star('f7')?20:0)}
 
@@ -276,7 +276,7 @@ function killEnemy(e){
   const bon=onAction('kill');apGain('cls',S.cls,(e.boss?20:e.elite?3:1)*bon);if(e.elite||e.boss)deedProgress('elites');deedProgress('kills');
   // drops
   const dc=e.loot?1:Math.min(1,(e.boss?1:e.elite?.6:.12)*(1+d.dropPct/100));
-  if(chance(dc)){gainItem(makeItem(m,rollRarity(d.mf+(e.loot?e.loot*10:0),e.boss?2:e.elite?1:0)));if(e.boss)gainItem(makeItem(m,rollRarity(d.mf,1)))}
+  if(chance(dc)){gainItem(makeItem(m,rollRarity(d.mf+(e.loot?e.loot*10:0),e.boss||e.elite?1:0)));if(e.boss)gainItem(makeItem(m,rollRarity(d.mf+25,1)))}
   if(chance(e.boss?1:e.elite?1:.15))addMat(z.mat,e.boss?RI(4,7):e.elite?RI(1,3):1);
   if(!e.def.tags.some(t=>['undead','construct','ooze','elemental'].includes(t))&&chance(.25))addMat('meat',e.boss?5:1);
   if(chance(.004*(e.boss?25:e.elite?5:1)))addMat(pick(['amethyst','ruby','sapphire','emerald','diamond'].slice(0,Math.min(5,1+Math.floor(S.zone/1.6)))),1);

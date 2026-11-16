@@ -393,12 +393,12 @@ P.inv=()=>{const s=S();const items=s.inv.slice().sort((a,b)=>UI.invSort==='r'?(b
   ${oddsCard()}
   <h3>Reagents</h3>${reag?`<div class="grid" style="--min:230px">${reag}</div>`:'<p class="muted small">Rare reagents come from the hardest targets of each profession (see each profession’s “Unlocks” card).</p>'}
   <h3>Materials</h3><div class="row">${mats||'<span class="muted">None yet.</span>'}</div><p class="muted">▲ = upgrade over what you wear. Tap 🔓 on a tile to lock it.</p>`;};
-function oddsCard(){const s=S(),mf=G.d.mf;const n=rarityOdds(mf),el=rarityOdds(mf,1),bo=rarityOdds(mf,2);
+function oddsCard(){const s=S(),mf=G.d.mf;const n=rarityOdds(mf),el=rarityOdds(mf,1),bo=rarityOdds(mf,1);
   const f=p=>p<=0?'<span class="muted">—</span>':`${p>=.1?(p*100).toFixed(1):p>=.01?(p*100).toFixed(2):(p*100).toPrecision(2)}%<div class="muted" style="font-size:10px">1 in ${fmt(Math.round(1/p))}</div>`;
   return `<div class="card oddc"><b>🎲 Drop odds</b> <span class="small muted">per item drop · your Magic Find ${fmt(Math.round(mf))}%</span>
   <table class="otab"><tr><th>Rarity</th><th>Power</th><th>Affixes</th><th>Normal</th><th>Elite</th><th>Boss</th></tr>
   ${D.RARITIES.map((r,i)=>`<tr><td class="r${i}"><b>${r.name}</b></td><td>×${r.mult}${i?`<div class="muted" style="font-size:10px">affix ×${r.am}</div>`:''}</td><td>${r.affixes}${i>=4?` +${i===5?2:1}★`:''}</td><td>${f(n[i])}</td><td>${f(el[i])}</td><td>${f(bo[i])}</td></tr>`).join('')}</table>
-  <div class="small muted">Bosses always drop Rare or better (plus a second item). ${star('f6')?'':'Mythic needs the 🔴 Mythic Attunement star.'} Smithing can <b>infuse</b> an item one tier up with profession reagents.</div></div>`}
+  <div class="small muted">Elites and bosses always drop Uncommon or better; bosses drop a second item with +25% Magic Find. ${star('f6')?'':'Mythic needs the 🔴 Mythic Attunement star.'} Smithing can <b>infuse</b> an item one tier up with profession reagents.</div></div>`}
 const upCache=new Map();function isUpgradeCached(it){const k=it.id+':'+G.S.cls+':'+(G.S.equip[it.slot]?G.S.equip[it.slot].id+'.'+G.S.equip[it.slot].ench:'');if(!upCache.has(k)){if(upCache.size>2000)upCache.clear();upCache.set(k,isUpgrade(it))}return upCache.get(k)}
 function infuseBox(it,eq){const inf=infuseInfo(it);if(!inf)return '';const f=inf.f;
   return `<div class="card infuse" style="margin-top:8px"><b>⚒️ Infuse: <span class="r${it.r}">${D.RARITIES[it.r].name}</span> → <span class="r${f.to}">${D.RARITIES[f.to].name}</span></b>
