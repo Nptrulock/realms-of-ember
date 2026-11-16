@@ -4,6 +4,29 @@ A deep, deliberately grindy incremental idle RPG in an original high-fantasy set
 
 **Play:** https://nptrulock.github.io/realms-of-ember/
 
+## v3: rarity, reagents & the Star Chart
+- **Rarity is a big deal.** Each tier is much rarer and much stronger than the one below:
+
+  | Rarity | Base odds (0% MF) | Base power | Affix strength | Affixes |
+  |---|---|---|---|---|
+  | Common | 71.1% | ×1 | ×1 | 0 |
+  | Uncommon | 22.3% (1 in 4) | ×1.6 | ×1.3 | 1 |
+  | Rare | 5.6% (1 in 18) | ×2.6 | ×1.7 | 2 |
+  | Epic | 0.91% (1 in 109) | ×4.2 | ×2.2 | 3 |
+  | Legendary | 0.10% (1 in 985) | ×7 | ×3 | 4 + legendary power |
+  | Mythic | 0.006% (1 in 16,418) | ×12 | ×4.2 | 5 + 2 powers |
+
+  Exact odds for your current Magic Find are shown in the Inventory. Epic and better items glow, and drops get a banner.
+- **Bulk sell / salvage any rarity**, including Legendary and Mythic. Epic and up asks first. Tap 🔓 on any tile to lock it; locked items are never sold.
+- **High-level profession unlocks feed progression.** The hardest targets of every profession drop a rare reagent, shown with a "Used in" list:
+  - Smithing infusions raise an item one tier: Rare→Epic, Epic→Legendary, Legendary→Mythic.
+  - Enchanting keys open Dragon's Roost and the Endless Rift.
+  - Alchemy reagents (Phoenix Draught, Philosopher's Catalyst) and Cooking's Hero's Banquet.
+  - Star Chart goals.
+- **Ascension is a Star Chart.** 9 constellations and 60 stars, with pan, pinch and zoom. Light stars next to lit ones with 🌠 Stardust. Some stars also need a deed. Finishing a constellation lights its capstone.
+  - Ascending now keeps 20–60% of profession levels, up to 30% of class levels and 25% of gold, plus tools, recipes, reagents and zone keys.
+  - Old Ascension-shop purchases are refunded as Stardust. Mythic Attunement and Astral Familiar map straight onto their stars.
+
 ## v2: the grind update
 - **Real-time only.** No game-speed multiplier. Class and profession levels take at least 10 minutes each from level 1, and much longer after that.
 - **Slow offline.** Away time earns 20% of the online rate. The 🌙 Night Watch mastery and the Hourglass relic raise it to at most 60%. The offline cap is 2h, or 6h/12h with Town upgrades.
