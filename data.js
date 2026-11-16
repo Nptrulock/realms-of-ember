@@ -632,11 +632,11 @@ D.ACH.push(
 /* ================= v3: profession reagents, infusions, zone keys, Star Chart ================= */
 // Unique reagents: only drop from a profession's hardest targets. Each one feeds something you need.
 D.UNIQUE=[ // p: profession, at: target id(s) or minimum target level, ch: chance per successful action
-  {id:'deepcore', n:'Deepcore Ore',     i:'🪨',p:'mining',   lv:40,at:'Adamantine vein (Mining 40)',ch:.03,d:'Ore that only forms at the very bottom of Adamantine veins.'},
+  {id:'deepcore', n:'Deepcore Ore',     i:'🪨',p:'mining',   lv:40,at:'Adamantine and Starmetal veins (Mining 40+)',ch:.03,d:'Ore that only forms at the very bottom of Adamantine veins.'},
   {id:'stariron', n:'Star Iron',        i:'☄️',p:'mining',   lv:60,at:'Starmetal vein (Mining 60)', ch:.02,d:'A meteor fragment, harder than any forged metal.'},
-  {id:'phoenixbloom',n:'Phoenix Bloom', i:'🌺',p:'herbalism',lv:40,at:'Emberroot plots (Herbalism 40)',ch:.25,d:'A flower that regrows from its own ashes.'},
+  {id:'phoenixbloom',n:'Phoenix Bloom', i:'🌺',p:'herbalism',lv:40,at:'Emberroot or Starbloom harvests (Herbalism 40+)',ch:.25,d:'A flower that regrows from its own ashes.'},
   {id:'nectar',   n:'Starbloom Nectar', i:'🍯',p:'herbalism',lv:60,at:'Starbloom plots (Herbalism 60)',ch:.25,d:'Glows faintly. Alchemists pay anything for it.'},
-  {id:'pearl',    n:'Frostscale Pearl', i:'🦪',p:'fishing',  lv:40,at:'Frozen Sea (Fishing 40)',    ch:.03,d:'Grown inside the frost-shark’s gills.'},
+  {id:'pearl',    n:'Frostscale Pearl', i:'🦪',p:'fishing',  lv:40,at:'the Frozen Sea or deeper (Fishing 40+)',    ch:.03,d:'Grown inside the frost-shark’s gills.'},
   {id:'essence',  n:'Abyssal Essence',  i:'🫧',p:'fishing',  lv:60,at:'Abyssal Trench (Fishing 60)',ch:.02,d:'Mythic-tier essence wrung from trench leviathans.'},
   {id:'soulshard',n:'Soul Shard',       i:'💠',p:'summoning',lv:45,at:'Frost Wraith or higher (Summoning 45)',ch:.10,d:'Left behind when a greater spirit is bound.'},
   {id:'muse',     n:'Muse’s Token',     i:'🎭',p:'dancing',  lv:45,at:'routines of Ember Waltz or Starfall Ballet (Dancing 45)',ch:.5,routine:1,d:'Thrown to the stage by an unseen muse.'},
@@ -766,7 +766,7 @@ D.STARS=[
   {id:'rc',c:'fate',n:'Loom of Fate',i:'🕸️',u:440,v:0,cap:1,l:['r4','r5'],d:'+100% relic odds · +30% Stardust',ap:d=>{d.relicLuck+=100},flag:1},
 ];
 (function(){const cs={};for(const c of D.CONST)cs[c.id]=c;
-  for(const n of D.STARS){if(!n.c){n.x=0;n.y=0;continue}const a=cs[n.c].a*Math.PI/180;n.x=Math.round(Math.cos(a)*n.u-Math.sin(a)*n.v);n.y=Math.round(Math.sin(a)*n.u+Math.cos(a)*n.v)}
+  for(const n of D.STARS){if(!n.c){n.x=0;n.y=0;continue}const a=cs[n.c].a*Math.PI/180;const u=n.u*1.15;n.x=Math.round(Math.cos(a)*u-Math.sin(a)*n.v);n.y=Math.round(Math.sin(a)*u+Math.cos(a)*n.v)}
   D.STAR={};for(const n of D.STARS)D.STAR[n.id]=n;
   D.STAR_LINKS=[];for(const n of D.STARS)for(const m of (n.l||[])){D.STAR_LINKS.push([m,n.id])}
   // adjacency both ways

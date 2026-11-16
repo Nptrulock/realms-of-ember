@@ -29,7 +29,7 @@ function showIntro(){
 
 /* ---------------- top bar ---------------- */
 function renderTop(){const s=S();const dc=dailyCap(),dn=Math.min(dc,s.daily.count||0);
-  setHTML($('#res'),`<span class="chip">🪙 ${fmt(s.gold)}</span>${s.shards||s.ascensions?`<span class="chip">🌟 ${fmt(s.shards)}</span>`:''}<span class="chip">✨ ${fmt(s.mats.dust||0)}</span><span class="chip" title="General Action Points">🎖️ ${fmt(Math.floor(s.ap.gen))}</span><span class="chip" title="Daily double-AP actions used today · streak" data-a="tab" data-t="mastery" style="cursor:pointer">📅 ${dn}/${dc}${s.daily.streak>1?' 🔥'+s.daily.streak:''}</span><span class="chip">⚡ ${fmt(G.d.power)}</span>`);}
+  setHTML($('#res'),`<span class="chip">🪙 ${fmt(s.gold)}</span>${s.shards||s.ascensions?`<span class="chip">🌠 ${fmt(Math.floor(s.shards))}</span>`:''}<span class="chip">✨ ${fmt(s.mats.dust||0)}</span><span class="chip" title="General Action Points">🎖️ ${fmt(Math.floor(s.ap.gen))}</span><span class="chip" title="Daily double-AP actions used today · streak" data-a="tab" data-t="mastery" style="cursor:pointer">📅 ${dn}/${dc}${s.daily.streak>1?' 🔥'+s.daily.streak:''}</span><span class="chip">⚡ ${fmt(G.d.power)}</span>`);}
 
 /* ---------------- stage ---------------- */
 let curBg=null;
@@ -302,7 +302,7 @@ P.profs=()=>{const s=S(),p=UI.profSel,pd=D.PROFS[p],pr=s.profs[p];const info=act
   body+=profDetail(p);
   return `<h2>⚒️ Professions</h2>${pager('profs',`${pd.i} ${pd.n} · Lv ${pr.lvl}`,body)}`;};
 const MODN={dmgPct:'damage',regenPct:'HP regen/s',hpPct:'max HP',profSpeed:'profession speed',xp:'XP',profXp:'profession XP',crit:'crit'};
-function profDetail2(p,lv){const s=S();let h='';const t=(x)=>`Lv ${x.lv} · ${x.t}s · ${succ(p,x.lv)}`;
+function profDetail2(p,lv){const s=S();let h='';const t=(x)=>`Lv ${x.lv} · ${x.t}s · ${succ(p,x.lv)}${uq(p,x.lv)}`;
   if(p==='summoning'){const ss=s.ps.summoning,cap=summonCap();
     h=`<h3>Rituals</h3><div class="grid" style="--min:170px">${D.SUMMONS.map(x=>selCard('setSum',{id:x.id},ss.target===x.id,lv<x.lv,`<b>${x.i} ${x.n}</b><div class="small">${t(x)}<br>Base power ${x.power} (×${(1+lv*.02).toFixed(2)} at your level)<br>${Object.keys(x.in).length?matsHave(x.in):'No materials'}</div>`)).join('')}</div>
     <h3>Bestiary ${s.summons.length}/${cap}</h3><p class="small muted">⚔️ Fighters strike beside your hero every 2.5s for 25% of power × damage. 🔧 Workers add power×3% speed to their profession. Roster +1 every 12 levels.</p>
@@ -324,9 +324,10 @@ function profDetail2(p,lv){const s=S();let h='';const t=(x)=>`Lv ${x.lv} · ${x.
     <div class="row" style="margin-top:6px">Anthem: ${D.SONGS.filter(x=>lv>=x.lv).map(x=>btn('setAnthem',x.i+' '+x.n,{data:{id:x.id},cls:'sm'+(bs.anthem===x.id?' on':'')})).join('')}</div>
     <p class="small muted">Your Anthem buffs you at all times: song effect × mastery% × (1 + Bard level/100). Practise a song to raise its mastery.</p>`}
   if(p==='fishing'){const fs=s.ps.fishing;
-    h=`<h3>Fishing spots · 🐟 ${fmt(s.mats.fish||0)} fish</h3><div class="grid" style="--min:180px">${D.FISHING.map(x=>selCard('setFish',{id:x.id},fs.target===x.id,lv<x.lv,`<b>${x.i} ${x.n}</b><div class="small">Lv ${x.lv} · bite in ${(x.t*.5).toFixed(0)}–${(x.t*1.8).toFixed(0)}s · ${succ('fishing',x.lv)}<br>${x.fish} fish per catch · 2% sunken treasure</div>`)).join('')}</div>
-    <p class="small muted">Fish are used by Cooking (Grilled Trout, Seafarer's Chowder).</p>`}
+    h=`<h3>Fishing spots · 🐟 ${fmt(s.mats.fish||0)} fish</h3><div class="grid" style="--min:180px">${D.FISHING.map(x=>selCard('setFish',{id:x.id},fs.target===x.id,lv<x.lv,`<b>${x.i} ${x.n}</b><div class="small">Lv ${x.lv} · bite in ${(x.t*.5).toFixed(0)}–${(x.t*1.8).toFixed(0)}s · ${succ('fishing',x.lv)}<br>${x.fish} fish per catch · 2% sunken treasure${uq('fishing',x.lv)}</div>`)).join('')}</div>
+    <p class="small muted">Fish are used by Cooking (Grilled Trout, Seafarer's Chowder, Hero’s Banquet).</p>`}
   return h}
+function uq(p,lv){const us=D.UNIQUE.filter(u=>u.p===p&&lv>=u.lv&&!u.routine);return us.length?`<br><span class="usedin">${us.map(u=>`${u.i} ${(uniqueChance(u)*100).toFixed(u.ch<.1?1:0)}% ${u.n}`).join(' · ')}</span>`:''}
 function profUnlocks(p){const s=S(),lv=s.profs[p].lvl;const rows=[];const ok=x=>lv>=x?'✅':'🔒';
   for(const u of D.UNIQUE.filter(x=>x.p===p))rows.push(`<div class="unl ${lv>=u.lv?'':'off'}"><b>${ok(u.lv)} Lv ${u.lv} · ${u.i} ${u.n}</b> <span class="muted">(you have ${fmt(s.mats[u.id]||0)})</span><div class="small">${(uniqueChance(u)*100).toFixed(u.ch<.1?1:0)}% per ${u.routine?'finished routine':'success'} at ${u.at}. ${u.d}</div><div class="small usedin">Used in: ${(D.USED_IN[u.id]||[]).join(' · ')}</div></div>`);
   if(p==='alchemy')for(const rc of D.PROFS.alchemy.recipes.filter(x=>x.mat))rows.push(`<div class="unl ${lv>=rc.lv?'':'off'}"><b>${ok(rc.lv)} Lv ${rc.lv} · ${rc.i} ${rc.n}</b> <span class="muted">(you have ${fmt(s.mats[rc.mat]||0)})</span><div class="small">Brew from ${matsHave(rc.in)}</div><div class="small usedin">Used in: ${(D.USED_IN[rc.mat]||[]).join(' · ')}</div></div>`);
@@ -345,8 +346,8 @@ function succ(p,req){const v=profSucc(p,req);return `<span class="${v<.5?'r5':v>
 function profDetail(p){const s=S(),lv=s.profs[p].lvl;let h=profUnlocks(p);return profDetailBase(p,lv)+h}
 function profDetailBase(p,lv){const s=S();let h='';
   if(D.PROFS[p].kind==='perform'||p==='summoning'||p==='fishing')h+=profDetail2(p,lv);
-  if(p==='mining'){h=`<h3>Veins · Lode streak ${s.ps.mining.streak||0}/20 (+${(s.ps.mining.streak||0)*5}% yield)</h3><div class="grid" style="--min:170px">${D.PROFS.mining.nodes.map(n=>selCard('setNode',{id:n.id},s.ps.mining.node===n.id,lv<n.lv,`<b>${D.MATS[n.id].i} ${D.MATS[n.id].n}</b><div class="small">Lv ${n.lv} · ${n.t}s · ${succ('mining',n.lv)}<br>Gem: ${D.MATS[n.gem].i} ${D.MATS[n.gem].n}<br>Owned: ${fmt(s.mats[n.id]||0)}</div>`)).join('')}</div>`}
-  if(p==='herbalism'){h=`<h3>Seeds</h3><div class="grid" style="--min:150px">${D.PROFS.herbalism.seeds.map(n=>selCard('setSeed',{id:n.id},s.ps.herbalism.seed===n.id,lv<n.lv,`<b>${D.MATS[n.id].i} ${D.MATS[n.id].n}</b><div class="small">Lv ${n.lv} · ${n.t}s grow · ${succ('herbalism',n.lv)}<br>Owned: ${fmt(s.mats[n.id]||0)}</div>`)).join('')}</div>
+  if(p==='mining'){h=`<h3>Veins · Lode streak ${s.ps.mining.streak||0}/20 (+${(s.ps.mining.streak||0)*5}% yield)</h3><div class="grid" style="--min:170px">${D.PROFS.mining.nodes.map(n=>selCard('setNode',{id:n.id},s.ps.mining.node===n.id,lv<n.lv,`<b>${D.MATS[n.id].i} ${D.MATS[n.id].n}</b><div class="small">Lv ${n.lv} · ${n.t}s · ${succ('mining',n.lv)}<br>Gem: ${D.MATS[n.gem].i} ${D.MATS[n.gem].n}<br>Owned: ${fmt(s.mats[n.id]||0)}${uq('mining',n.lv)}</div>`)).join('')}</div>`}
+  if(p==='herbalism'){h=`<h3>Seeds</h3><div class="grid" style="--min:150px">${D.PROFS.herbalism.seeds.map(n=>selCard('setSeed',{id:n.id},s.ps.herbalism.seed===n.id,lv<n.lv,`<b>${D.MATS[n.id].i} ${D.MATS[n.id].n}</b><div class="small">Lv ${n.lv} · ${n.t}s grow · ${succ('herbalism',n.lv)}<br>Owned: ${fmt(s.mats[n.id]||0)}${uq('herbalism',n.lv)}</div>`)).join('')}</div>
     <h3>Garden — ${plotsCount()} plots ${s.qol.autoHarvest?'· 🎃 Scarecrow active':''}</h3>${plotsHtml()}<p class="muted">Yield ${2+Math.floor(lv/15)} per plot · golden mutation ${(3+lv*.05).toFixed(1)}% · +1 plot per 20 levels, more in Town.</p>`}
   if(p==='smithing'){const ss=s.ps.smithing,t=D.PROFS.smithing.tiers.find(x=>x.id===ss.tier),cr=crackChance(ss.target);
     h=`<h3>Metal</h3><div class="grid" style="--min:160px">${D.PROFS.smithing.tiers.map(n=>selCard('setTier',{id:n.id},ss.tier===n.id,lv<n.lv,`<b>${n.n}</b><div class="small">Lv ${n.lv} · item level ${n.il}+<br>${D.MATS[n.ore].i} ${D.MATS[n.ore].n} + ${D.MATS[n.mat].i} ${D.MATS[n.mat].n}</div>`)).join('')}</div>
@@ -394,7 +395,7 @@ P.inv=()=>{const s=S();const items=s.inv.slice().sort((a,b)=>UI.invSort==='r'?(b
   <h3>Materials</h3><div class="row">${mats||'<span class="muted">None yet.</span>'}</div><p class="muted">▲ = upgrade over what you wear. Tap 🔓 on a tile to lock it.</p>`;};
 function oddsCard(){const s=S(),mf=G.d.mf;const n=rarityOdds(mf),el=rarityOdds(mf,1),bo=rarityOdds(mf,2);
   const f=p=>p<=0?'<span class="muted">—</span>':`${p>=.1?(p*100).toFixed(1):p>=.01?(p*100).toFixed(2):(p*100).toPrecision(2)}%<div class="muted" style="font-size:10px">1 in ${fmt(Math.round(1/p))}</div>`;
-  return `<div class="card odds"><b>🎲 Drop odds</b> <span class="small muted">per item drop · your Magic Find ${fmt(Math.round(mf))}%</span>
+  return `<div class="card oddc"><b>🎲 Drop odds</b> <span class="small muted">per item drop · your Magic Find ${fmt(Math.round(mf))}%</span>
   <table class="otab"><tr><th>Rarity</th><th>Power</th><th>Affixes</th><th>Normal</th><th>Elite</th><th>Boss</th></tr>
   ${D.RARITIES.map((r,i)=>`<tr><td class="r${i}"><b>${r.name}</b></td><td>×${r.mult}${i?`<div class="muted" style="font-size:10px">affix ×${r.am}</div>`:''}</td><td>${r.affixes}${i>=4?` +${i===5?2:1}★`:''}</td><td>${f(n[i])}</td><td>${f(el[i])}</td><td>${f(bo[i])}</td></tr>`).join('')}</table>
   <div class="small muted">Bosses always drop Rare or better (plus a second item). ${star('f6')?'':'Mythic needs the 🔴 Mythic Attunement star.'} Smithing can <b>infuse</b> an item one tier up with profession reagents.</div></div>`}
@@ -432,7 +433,7 @@ const SC={x:0,y:0,k:.3,init:false};
 function constCenter(c){const ns=D.STARS.filter(n=>n.c===c);return [ns.reduce((a,n)=>a+n.x,0)/ns.length,ns.reduce((a,n)=>a+n.y,0)/ns.length]}
 function keepHtml(){const s=S(),k=keepPct();const pl=g=>D.PGROUP[g].map(p=>D.PROFS[p].i).join('');
   return `<div class="keepgrid"><div><b class="r1">✅ You keep</b><ul class="small">
-   <li>✨ Stardust and every lit star</li><li>🏺 Relics, 🏆 feats, 🎭 unlocked classes</li><li>🏰 Town QoL, 🔧 tools, 🎒 satchel, 🌱 plots</li><li>🎖️ Action Points & Mastery</li>
+   <li>🌠 Stardust and every lit star</li><li>🏺 Relics, 🏆 feats, 🎭 unlocked classes</li><li>🏰 Town QoL, 🔧 tools, 🎒 satchel, 🌱 plots</li><li>🎖️ Action Points & Mastery</li>
    <li>🔑 Zone keys and all rare reagents (🪨☄️🦪🫧…)</li><li>📖 Recipes: cooking signatures, brew & song mastery</li>
    <li>${pl('wilds')} <b>${k.wilds}%</b> · ${pl('workshop')} <b>${k.workshop}%</b> · ${pl('court')} <b>${k.court}%</b> of profession levels</li>
    <li>🧝 <b>${k.cls}%</b> of class levels · 🪙 <b>${k.gold}%</b> of gold</li><li>25% of Fame, Reputation and Favor</li></ul></div>
@@ -445,8 +446,8 @@ function starSvg(){const s=S();
   let neb='',lab='';
   for(const c of D.CONST){const [cx,cy]=constCenter(c.id);const [a,b]=constProgress(c.id);const done=s.stars[D.STARS.find(n=>n.c===c.id&&n.cap).id];
     defs+=`<radialGradient id="ng-${c.id}"><stop offset="0" stop-color="${c.color}" stop-opacity="${done?.38:.2}"/><stop offset="1" stop-color="${c.color}" stop-opacity="0"/></radialGradient>`;
-    neb+=`<ellipse data-a="starFocus" data-c="${c.id}" cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="230" ry="170" transform="rotate(${c.a} ${cx.toFixed(0)} ${cy.toFixed(0)})" fill="url(#ng-${c.id})"/>`;
-    const r=Math.PI*c.a/180,lx=Math.cos(r)*600,ly=Math.sin(r)*600;
+    neb+=`<ellipse data-a="starFocus" data-c="${c.id}" cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="250" ry="185" transform="rotate(${c.a} ${cx.toFixed(0)} ${cy.toFixed(0)})" fill="url(#ng-${c.id})"/>`;
+    const r=Math.PI*c.a/180,lx=Math.cos(r)*660,ly=Math.sin(r)*660;
     lab+=`<g class="clab" transform="translate(${lx.toFixed(0)} ${ly.toFixed(0)})" data-a="starFocus" data-c="${c.id}"><text class="cl1" fill="${c.color}">${c.i} ${esc(c.n)}</text><text class="cl2" y="20">${esc(c.sub)}</text><text class="cl3" y="40" fill="${c.color}">${a}/${b}${done?' ★':''}</text></g>`}
   let lines='';for(const [a,b] of D.STAR_LINKS){const oa=!!s.stars[a],ob=!!s.stars[b];const A=D.STAR[a],B=D.STAR[b];
     lines+=`<line class="sl ${oa&&ob?'lit':oa||ob?'near':'dark'}" style="--c:${col(b)}" x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}"/>`}
@@ -454,7 +455,7 @@ function starSvg(){const s=S();
     nodes+=`<g class="sn ${st} ${n.cap?'capn':''} ${UI.starSel===n.id?'sel':''}" style="--c:${col(n.id)}" data-a="star" data-id="${n.id}" transform="translate(${n.x} ${n.y})"><circle class="hit" r="28"/><circle class="halo" r="${r+9}"/><circle class="core" r="${r}"/><text class="ni" y="1">${n.i}</text><text class="nl" y="${r+16}">${esc(n.n)}</text></g>`}
   return `<svg class="scsvg" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs><g id="scv"><g class="bgst">${UI.bgStars}</g>${neb}${lab}${lines}${nodes}</g></svg>`}
 function applyChart(){const b=document.getElementById('starchart');if(!b)return;const g=b.querySelector('#scv');const r=b.getBoundingClientRect();if(!r.width)return;
-  if(!SC.init){SC.k=Math.max(.2,Math.min(r.width,r.height)/1500);SC.x=0;SC.y=0;SC.init=true}
+  if(!SC.init){SC.k=Math.max(.2,Math.min(r.width,r.height)/1400);SC.x=0;SC.y=0;SC.init=true}
   g.setAttribute('transform',`translate(${(r.width/2+SC.x).toFixed(1)} ${(r.height/2+SC.y).toFixed(1)}) scale(${SC.k.toFixed(4)})`);b.classList.toggle('zin',SC.k>.55)}
 function zoomAt(cx,cy,f){const b=document.getElementById('starchart');if(!b)return;const r=b.getBoundingClientRect();const k2=Math.max(.18,Math.min(2.8,SC.k*f));f=k2/SC.k;
   const px=cx-r.left-r.width/2,py=cy-r.top-r.height/2;SC.x=px-(px-SC.x)*f;SC.y=py-(py-SC.y)*f;SC.k=k2;applyChart()}
@@ -478,15 +479,15 @@ function starDetail(){const s=S(),id=UI.starSel;if(!id||!D.STAR[id])return `<div
   else if(st==='cap'){const [a,b]=constProgress(n.c);act=`<span class="small">🌠 Capstone — lights itself when all ${b} stars of ${esc(c.n)} are lit (${a}/${b}).</span>`}
   else if(st==='locked')act=`<span class="small muted">🔒 Light a connected star first: ${n.adj.map(x=>D.STAR[x].i+' '+esc(D.STAR[x].n)).join(', ')}</span>`;
   else{if(n.goal){const [a,b]=n.goal.p(s);act+=`<div class="small">🎯 ${esc(n.goal.d)} — <b class="${a>=b?'r1':''}">${fmt(a)}/${fmt(b)}</b></div>${bar(a/b,'xpfill')}`}
-    act+=btn('buyStar',`✨ Light for ${n.cost}`,{data:{id},cls:'gold',dis:st!=='buy'})+(st==='poor'?` <span class="small muted">Need ${n.cost-Math.floor(s.shards)} more Stardust</span>`:'')}
+    act+=btn('buyStar',`🌠 Light for ${n.cost}`,{data:{id},cls:'gold',dis:st!=='buy'})+(st==='poor'?` <span class="small muted">Need ${n.cost-Math.floor(s.shards)} more Stardust</span>`:'')}
   return `<div class="card stardet" style="--c:${c?c.color:'#ffcf6b'}"><div class="hd"><span class="ic">${n.i}</span><div class="sp"><b>${esc(n.n)}</b>${n.cap?' <span class="pill">Capstone</span>':''}<div class="small muted">${c?c.i+' '+esc(c.n)+' · '+esc(c.sub):'Galaxy core'}</div></div></div><div style="margin:6px 0"><b>${esc(n.d)}</b></div>${act}</div>`}
 P.ascend=()=>{const s=S(),pv=stardustParts(),can=canAscend(),g=pv?pv.total:0;
   const lit=D.STARS.filter(n=>s.stars[n.id]).length-1,buy=D.STARS.filter(n=>starState(n.id)==='buy').length;
   let nxt='';{const zi=s.zones.findIndex((z,i)=>!z.cleared&&!D.ZONES[i].endless);if(zi>=0&&pv){const m2=D.ZONES[zi].max+2;if(m2>pv.m){const d2=Math.pow(m2/10,2.2)-pv.deep;nxt=`Beating ${D.ZONES[zi].i} ${D.ZONES[zi].n}'s boss adds ≈ <b>+${fmt(Math.floor(d2*(1+pv.pct/100)*(1+pv.saga/100)))}</b>.`}}}
   const br=pv?`Deepest foe Lv ${pv.m} → ${pv.deep.toFixed(1)} · class levels → ${pv.cls.toFixed(1)} · profession levels → ${pv.prof.toFixed(1)}${pv.pct?` · Fate bonus +${pv.pct}%`:''}${pv.saga?` · 📜 Saga +${pv.saga}%`:''}`:'Conquer foes of level 20+ to earn Stardust.';
   return `<h2>🌌 Star Chart</h2>
-  <div class="card asc"><div class="row"><div><div class="big">✨ ${fmt(Math.floor(s.shards))}</div><div class="muted small">Stardust · ${lit} stars lit · ${s.ascensions} ascensions${buy?` · <b class="r1">${buy} ready to light</b>`:''}</div></div><span class="sp"></span>
-   <div style="text-align:right"><div>Ascend now: <b class="r4">+${fmt(g)} ✨</b></div>${btn('ascend','🌟 Ascend',{cls:'gold',dis:!can})}</div></div>
+  <div class="card asc"><div class="row"><div><div class="big">🌠 ${fmt(Math.floor(s.shards))}</div><div class="muted small">Stardust · ${lit} stars lit · ${s.ascensions} ascensions${buy?` · <b class="r1">${buy} ready to light</b>`:''}</div></div><span class="sp"></span>
+   <div style="text-align:right"><div>Ascend now: <b class="r4">+${fmt(g)} 🌠</b></div>${btn('ascend','🌟 Ascend',{cls:'gold',dis:!can})}</div></div>
    <div class="small muted" style="margin-top:4px">${can?'':'🔒 Defeat The Hollow Priest (Sunken Crypt) to unlock Ascension. '}${br}${nxt?'<br>'+nxt:''}</div>
    <div style="margin-top:6px">${btn('keepToggle',UI.keepOpen?'▾ What you keep / what resets':'▸ What you keep / what resets',{cls:'sm'})}</div>${UI.keepOpen?keepHtml():''}</div>
   <div class="starwrap"><div id="starchart" class="starchart">${starSvg()}<div class="scctl">${btn('starZoom','＋',{data:{d:1.35},cls:'sm'})}${btn('starZoom','−',{data:{d:.74},cls:'sm'})}${btn('starFit','⤢',{cls:'sm'})}</div><div class="schint">Drag · pinch or scroll to zoom · tap a star</div></div></div>
@@ -567,7 +568,7 @@ const A={
   keepToggle:()=>{UI.keepOpen=!UI.keepOpen},
   equipBest:()=>{const s=S();let n=0;for(const sl of D.SLOTS){let best=null;for(const it of s.inv)if(it.slot===sl&&isUpgrade(it)&&(!best||powerWith(sl,it)>powerWith(sl,best)))best=it;if(best){equipItem(best);n++}}toast(n?`Equipped ${n} upgrade${n>1?'s':''}`:'Already wearing your best gear')},
   qol:e=>buyQol(e.id),guild:e=>buyGuild(e.id),satchel:()=>buySatchel(),plot:()=>buyPlot(),
-  ascend:e=>{if(!canAscend())return;const g=shardPreview();if(e.ok!=='1'){modal(`<h2>🌟 Ascend for ✨${fmt(g)} Stardust?</h2>${keepHtml()}<div class="row" style="margin-top:10px">${btn('ascend','🌟 Ascend',{data:{ok:1},cls:'gold'})}<span class="sp"></span>${btn('close','Not yet')}</div>`);return}closeModal();ascend();UI.enemyEls.forEach(el=>el.remove());UI.enemyEls.clear();curBg=null;banner('🌟 ASCENDED');save()},
+  ascend:e=>{if(!canAscend())return;const g=shardPreview();if(e.ok!=='1'){modal(`<h2>🌟 Ascend for 🌠${fmt(g)} Stardust?</h2>${keepHtml()}<div class="row" style="margin-top:10px">${btn('ascend','🌟 Ascend',{data:{ok:1},cls:'gold'})}<span class="sp"></span>${btn('close','Not yet')}</div>`);return}closeModal();ascend();UI.enemyEls.forEach(el=>el.remove());UI.enemyEls.clear();curBg=null;banner('🌟 ASCENDED');save()},
   drink:e=>drinkElixir(e.id),eat:e=>eatMeal(e.id,e.p==='1'),
   logf:e=>{UI.logFilter=e.c},
   toggleSet:e=>{const st=S().settings;st[e.k]=!st[e.k]},
@@ -625,7 +626,7 @@ function showMigration(m,off){if(m.from>=2)return showMigration3(m,off);const rs
   <p class="small"><b>Converted for you:</b> old speed runes became 🐕 Hunting Hounds and 📒 Steward's Ledger, and the old astral speed upgrade became 🌀 Astral Haste. <b>Head-start AP</b> for your past play: 🎖️ ${fmt(m.gen)} general, ${fmt(m.cl)} class, ${fmt(m.pr)} profession AP.</p>
   ${m.v3?v3Html(m.v3):''}<div class="row"><span class="sp"></span>${btn(off?'showOff':'close','Onward!',{cls:'gold'})}</div>`);UI.pendingOff=off}
 function v3Html(v){return `<h3>🌌 v3 — the Star Chart</h3><ul class="small"><li><b>Ascension is now a Star Chart.</b> 9 themed constellations, 60 stars, capstones for finishing each one. Ascending now keeps 20–60% of profession levels, recipes, tools, reagents and more.</li>
-  <li><b>Old Ascension upgrades refunded:</b> ✨ ${fmt(v.refund)} Stardust${v.mapped.length?` · mapped to stars: ${v.mapped.join(', ')}`:''}.</li>
+  <li><b>Old Ascension upgrades refunded:</b> 🌠 ${fmt(v.refund)} Stardust${v.mapped.length?` · mapped to stars: ${v.mapped.join(', ')}`:''}.</li>
   <li><b>Rarity is a big deal now.</b> Epic ×4.2, Legendary ×7, Mythic ×12 power, and much rarer. Exact odds are in the Inventory.</li>
   <li><b>High-level profession unlocks</b> now drop rare reagents used for Smithing infusions (Rare→Epic→Legendary→Mythic), zone keys and stars.</li>
   <li><b>Bulk sell any rarity</b> (Epic+ asks first) and 🔒 lock items right on the tile.</li></ul>`}

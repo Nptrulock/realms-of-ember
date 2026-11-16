@@ -45,7 +45,7 @@ function log(msg,cat='info'){const S=G.S;S.log.unshift({t:Date.now(),m:msg,c:cat
 function emit(e){if(G.fx){G.ev.push(e);if(G.ev.length>300)G.ev.splice(0,100)}}
 
 /* ---------- curves ---------- */
-const xpNeed=L=>Math.floor(monXp(L+2)*138*Math.pow(1.05,L)*(1+L/4)*(1+1.2*Math.exp(-Math.pow((L-10)/7,2))));
+const xpNeed=L=>Math.floor(monXp(L+2)*138*Math.pow(1.05,L)*(1+L/4)*(1+1.35*Math.exp(-Math.pow((L-10)/7,2))));
 const profXpNeed=L=>Math.floor(950*Math.pow(1.1,L-1)*(1+L/40));
 const actXp=(req,t)=>t/6*8*Math.pow(1.035,Math.max(0,req-1));
 const monHp=m=>14*Math.pow(1.135,m)*(1+m/10);
