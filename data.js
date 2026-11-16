@@ -6,13 +6,13 @@ D.STAT_NAMES = {str:'Strength',dex:'Dexterity',con:'Constitution',int:'Intellige
 D.STAT_SHORT = {str:'STR',dex:'DEX',con:'CON',int:'INT',wis:'WIS',cha:'CHA'};
 D.BASE_DMG_CAP = 99999;
 
-D.RARITIES = [
-  {name:'Common',    color:'#b9b4a8', mult:1.00, affixes:0, w:600},
-  {name:'Uncommon',  color:'#55d46e', mult:1.20, affixes:1, w:280},
-  {name:'Rare',      color:'#4aa3ff', mult:1.45, affixes:2, w:90},
-  {name:'Epic',      color:'#b56cff', mult:1.75, affixes:3, w:22},
-  {name:'Legendary', color:'#ff9d2e', mult:2.20, affixes:4, w:4},
-  {name:'Mythic',    color:'#ff4d6d', mult:3.00, affixes:5, w:0.4},
+D.RARITIES = [ // v3: every tier is much rarer AND much stronger than the one below
+  {name:'Common',   color:'#b9b4a8',mult:1.0, am:1.0,affixes:0,w:700},
+  {name:'Uncommon', color:'#55d46e',mult:1.6, am:1.3,affixes:1,w:220},
+  {name:'Rare',     color:'#4aa3ff',mult:2.6, am:1.7,affixes:2,w:55},
+  {name:'Epic',     color:'#b56cff',mult:4.2, am:2.2,affixes:3,w:9},
+  {name:'Legendary',color:'#ff9d2e',mult:7.0, am:3.0,affixes:4,w:1},
+  {name:'Mythic',   color:'#ff4d6d',mult:12.0,am:4.2,affixes:5,w:0.06},
 ];
 D.SLOTS = ['weapon','offhand','helm','chest','gloves','boots','ring','amulet'];
 D.SLOT_ICON = {weapon:'⚔️',offhand:'🛡️',helm:'🪖',chest:'🥋',gloves:'🧤',boots:'👢',ring:'💍',amulet:'📿'};
@@ -628,3 +628,149 @@ D.ACH.push(
   {id:'rep3k',n:'Voice of the Court',d:'Reach 3,000 Reputation',t:s=>(s.ps.advising.rep||0)>=3000},
   {id:'army',n:'Grand Army',d:'Lead 25 troops at once (General)',t:s=>(s.stats.maxTroops||0)>=25},
 );
+
+/* ================= v3: profession reagents, infusions, zone keys, Star Chart ================= */
+// Unique reagents: only drop from a profession's hardest targets. Each one feeds something you need.
+D.UNIQUE=[ // p: profession, at: target id(s) or minimum target level, ch: chance per successful action
+  {id:'deepcore', n:'Deepcore Ore',     i:'🪨',p:'mining',   lv:40,at:'Adamantine vein (Mining 40)',ch:.03,d:'Ore that only forms at the very bottom of Adamantine veins.'},
+  {id:'stariron', n:'Star Iron',        i:'☄️',p:'mining',   lv:60,at:'Starmetal vein (Mining 60)', ch:.02,d:'A meteor fragment, harder than any forged metal.'},
+  {id:'phoenixbloom',n:'Phoenix Bloom', i:'🌺',p:'herbalism',lv:40,at:'Emberroot plots (Herbalism 40)',ch:.25,d:'A flower that regrows from its own ashes.'},
+  {id:'nectar',   n:'Starbloom Nectar', i:'🍯',p:'herbalism',lv:60,at:'Starbloom plots (Herbalism 60)',ch:.25,d:'Glows faintly. Alchemists pay anything for it.'},
+  {id:'pearl',    n:'Frostscale Pearl', i:'🦪',p:'fishing',  lv:40,at:'Frozen Sea (Fishing 40)',    ch:.03,d:'Grown inside the frost-shark’s gills.'},
+  {id:'essence',  n:'Abyssal Essence',  i:'🫧',p:'fishing',  lv:60,at:'Abyssal Trench (Fishing 60)',ch:.02,d:'Mythic-tier essence wrung from trench leviathans.'},
+  {id:'soulshard',n:'Soul Shard',       i:'💠',p:'summoning',lv:45,at:'Frost Wraith or higher (Summoning 45)',ch:.10,d:'Left behind when a greater spirit is bound.'},
+  {id:'muse',     n:'Muse’s Token',     i:'🎭',p:'dancing',  lv:45,at:'routines of Ember Waltz or Starfall Ballet (Dancing 45)',ch:.5,routine:1,d:'Thrown to the stage by an unseen muse.'},
+  {id:'holywater',n:'Blessed Water',    i:'💧',p:'praying',  lv:40,at:'prayers to Thalor or Nyx (Praying 40)',ch:.02,d:'Water a god has looked upon.'},
+  {id:'writ',     n:'Royal Writ',       i:'📃',p:'advising', lv:40,at:'the Duke or the High King (Advising 40)',ch:.03,d:'A sealed royal order — opens doors gold cannot.'},
+  {id:'saga',     n:'Saga Scroll',      i:'📜',p:'bard',     lv:35,at:'Lay of Lore or higher (Bard 35)',ch:.02,d:'Your deeds, set to verse.'},
+];
+for(const u of D.UNIQUE)D.MATS[u.id]={n:u.n,i:u.i,u:1};
+// crafted reagents
+D.MATS.phoenix={n:'Phoenix Draught',i:'🔥',u:1};
+D.MATS.catalyst={n:'Philosopher’s Catalyst',i:'🧿',u:1};
+D.PROFS.alchemy.recipes.push(
+  {id:'phoenix',n:'Phoenix Draught',i:'🔥',lv:45,in:{phoenixbloom:2,pearl:1},xp:300,mat:'phoenix'},
+  {id:'catalyst',n:'Philosopher’s Catalyst',i:'🧿',lv:65,in:{nectar:2,essence:1,stariron:1},xp:900,mat:'catalyst'});
+D.PROFS.cooking.recipes.push({id:'banquet',n:'Hero’s Banquet',i:'🍱',lv:55,in:{meat:4,fish:4,muse:1,holywater:1},xp:600,buff:{dmgPct:60,hpPct:40,mf:40,xp:15},sig:{dmgPct:3}});
+D.PROFS.cooking.recipes.sort((a,b)=>a.lv-b.lv);
+// Smithing infusions: raise an item's rarity by one tier using cross-profession reagents
+D.INFUSE={
+  2:{to:3,lv:30,in:{deepcore:2,pearl:1},d:'Rare → Epic'},
+  3:{to:4,lv:45,in:{stariron:2,essence:1,phoenix:1,writ:1},d:'Epic → Legendary'},
+  4:{to:5,lv:60,in:{catalyst:1,soulshard:3,muse:2},star:'f6',d:'Legendary → Mythic'},
+};
+// Enchanting attunements: permanent keys that open the last zones (kept through Ascension)
+D.KEYS=[
+  {id:'sigil',n:'Dragonbane Sigil',i:'🐉',lv:40,zone:7,in:{deepcore:3,pearl:3,holywater:2,dust:500},d:'Opens Dragon’s Roost'},
+  {id:'compass',n:'Rift Compass',i:'🧭',lv:55,zone:8,in:{stariron:2,essence:2,writ:2,soulshard:3},d:'Opens The Endless Rift'},
+];
+// "Used in" index for every reagent
+D.USED_IN={};
+(function(){const add=(k,txt)=>{(D.USED_IN[k]=D.USED_IN[k]||[]).push(txt)};
+  for(const r in D.INFUSE){const f=D.INFUSE[r];for(const k in f.in)add(k,`⚒️ ${f.d} infusion (Smithing ${f.lv})`)}
+  for(const k of D.KEYS)for(const m in k.in)if(m!=='dust')add(m,`🔮 ${k.n} — ${k.d} (Enchanting ${k.lv})`);
+  for(const rc of D.PROFS.alchemy.recipes)if(rc.mat)for(const m in rc.in)if(D.MATS[m].u)add(m,`⚗️ ${rc.n} (Alchemy ${rc.lv})`);
+  for(const rc of D.PROFS.cooking.recipes)for(const m in rc.in)if(D.MATS[m].u)add(m,`🍳 ${rc.n} (Cooking ${rc.lv})`);
+  add('saga','🌌 +3% Stardust each when you Ascend (max +60%)');
+  add('writ','🌌 Star Chart: Royal Charter');
+})();
+
+/* ---------------- STAR CHART (replaces the Ascension shop) ----------------
+   Nodes are bought with Stardust once they touch a lit star. Goal nodes also need a deed done.
+   Completing every node in a constellation lights its capstone for free. */
+D.CONST=[
+  {id:'forge',  n:'The Forge',       sub:'Equipment & Rarity',  i:'⚒️',color:'#ff9d2e',a:-90},
+  {id:'war',    n:'Warbringer',      sub:'Combat',              i:'⚔️',color:'#ff5a4a',a:-50},
+  {id:'hearth', n:'The Hearth',      sub:'Gold & Economy',      i:'🪙',color:'#ffd34d',a:-10},
+  {id:'time',   n:'The Hourglass',   sub:'Offline & Time',      i:'⌛',color:'#7fd3ff',a:30},
+  {id:'lineage',n:'The Lineage',     sub:'Classes',             i:'🎭',color:'#c58bff',a:70},
+  {id:'wilds',  n:'The Wilds',       sub:'Mining · Herbalism · Fishing',i:'🌿',color:'#55d46e',a:110},
+  {id:'workshop',n:'The Workshop',   sub:'Smithing · Alchemy · Cooking · Enchanting',i:'🔨',color:'#ff7a3d',a:150},
+  {id:'court',  n:'The Mystic Court',sub:'Summoning · Dancing · Praying · Advising · Bard',i:'🔯',color:'#ff7ad9',a:190},
+  {id:'fate',   n:'Fate’s Loom',     sub:'Relics & Ascension',  i:'🏺',color:'#dcdcff',a:230},
+];
+D.PGROUP={wilds:['mining','herbalism','fishing'],workshop:['smithing','alchemy','cooking','enchanting'],court:['summoning','dancing','praying','advising','bard']};
+const G_=(d,t,p)=>({d,t,p});
+const c20=S=>{const o=Object.assign({},S.stats.c20||{});for(const k in S.classes)if(S.classes[k].lvl>=20)o[k]=1;return Object.keys(o).length};
+const plv=(p,n)=>G_(`Reach ${p[0].toUpperCase()+p.slice(1)} level ${n}`,S=>S.stats.profMax[p]>=n,S=>[Math.min(n,S.stats.profMax[p]||1),n]);
+// u = distance from the galaxy core, v = sideways offset (chart units)
+D.STARS=[
+  {id:'origin',c:null,n:'Ember Core',i:'🔥',u:0,v:0,cost:0,d:'Your first light. Every constellation starts here.'},
+  // Forge
+  {id:'f1',c:'forge',n:'Keen Eye',i:'👁️',u:150,v:0,cost:2,l:['origin'],d:'+25% Magic Find',ap:d=>{d.mf+=25}},
+  {id:'f2',c:'forge',n:'Fine Temper',i:'🔩',u:235,v:-70,cost:4,l:['f1'],d:'+15% base stats on all gear',flag:1},
+  {id:'f3',c:'forge',n:'Epic Calling',i:'🟣',u:235,v:70,cost:6,l:['f1'],d:'Epic drop weight ×1.5',flag:1},
+  {id:'f4',c:'forge',n:'Salvager’s Art',i:'✨',u:320,v:-120,cost:4,l:['f2'],d:'+50% Arcane Dust from salvage, +25% sell value',ap:d=>{d.sellMult*=1.25}},
+  {id:'f7',c:'forge',n:'Deep Pockets',i:'🎒',u:410,v:-80,cost:5,l:['f4'],d:'+20 inventory slots',flag:1},
+  {id:'f5',c:'forge',n:'Legend’s Call',i:'🟠',u:320,v:120,cost:10,l:['f3'],goal:G_('Find an Epic item',S=>S.stats.found[3]>0,S=>[Math.min(1,S.stats.found[3]),1]),d:'Legendary drop weight ×1.5',flag:1},
+  {id:'f6',c:'forge',n:'Mythic Attunement',i:'🔴',u:410,v:80,cost:15,l:['f5'],goal:G_('Find or infuse a Legendary item',S=>S.stats.found[4]+S.stats.found[5]+((S.stats.infused||[])[4]||0)>0,S=>[Math.min(1,S.stats.found[4]+S.stats.found[5]+((S.stats.infused||[])[4]||0)),1]),d:'Mythic items can drop, and Smithing can infuse Legendary → Mythic',flag:1},
+  {id:'fc',c:'forge',n:'Heart of the Forge',i:'💎',u:500,v:0,cap:1,l:['f6','f7'],d:'All gear stats +25% more · Epic and better items roll +1 affix',flag:1},
+  // War
+  {id:'w1',c:'war',n:'Astral Might',i:'💪',u:150,v:0,cost:2,l:['origin'],d:'+25% damage',ap:d=>{d.dmgPct+=25}},
+  {id:'w2',c:'war',n:'Astral Vigor',i:'❤️',u:240,v:-60,cost:2,l:['w1'],d:'+25% max HP',ap:d=>{d.hpPct+=25}},
+  {id:'w3',c:'war',n:'Limit Breaker',i:'💥',u:240,v:60,cost:8,l:['w1'],d:'Damage cap ×3',ap:d=>{d.capMult*=3}},
+  {id:'w4',c:'war',n:'Swift Blade',i:'🌪️',u:330,v:-60,cost:6,l:['w2'],d:'+10% attack speed',ap:d=>{d.haste+=10}},
+  {id:'w5',c:'war',n:'Warlord',i:'👑',u:400,v:30,cost:10,l:['w3','w4'],goal:G_('Defeat 50 bosses (lifetime)',S=>S.stats.bosses>=50,S=>[Math.min(50,S.stats.bosses),50]),d:'+40% damage, +5% crit',ap:d=>{d.dmgPct+=40;d.crit+=5}},
+  {id:'wc',c:'war',n:'War Eternal',i:'🗡️',u:490,v:0,cap:1,l:['w5'],d:'+100% damage, +50% HP, damage cap ×10',ap:d=>{d.dmgPct+=100;d.hpPct+=50;d.capMult*=10}},
+  // Hearth
+  {id:'e1',c:'hearth',n:'Golden Touch',i:'🪙',u:150,v:0,cost:2,l:['origin'],d:'+30% gold',ap:d=>{d.gold+=30}},
+  {id:'e2',c:'hearth',n:'Nest Egg',i:'🥚',u:240,v:-60,cost:4,l:['e1'],d:'Keep 10% of your gold when you Ascend',flag:1},
+  {id:'e3',c:'hearth',n:'Merchant Prince',i:'⚖️',u:240,v:60,cost:6,l:['e1'],d:'+50% sell value, Town prices −5%',ap:d=>{d.sellMult*=1.5},flag:1},
+  {id:'e4',c:'hearth',n:'Head Start',i:'🚩',u:330,v:-70,cost:8,l:['e2'],d:'Each run starts with Whispering Woods and Goblin Warrens cleared',flag:1},
+  {id:'e5',c:'hearth',n:'Royal Charter',i:'📃',u:400,v:40,cost:10,l:['e3','e4'],goal:G_('Earn 1M gold (lifetime) and hold 2 Royal Writs',S=>S.stats.gold>=1e6&&(S.mats.writ||0)>=2,S=>[(S.stats.gold>=1e6?1:0)+Math.min(2,S.mats.writ||0),3]),d:'Keep 25% of your gold when you Ascend',flag:1},
+  {id:'ec',c:'hearth',n:'Midas Throne',i:'🏛️',u:490,v:0,cap:1,l:['e5'],d:'+100% gold · Head Start also clears the Sunken Crypt',ap:d=>{d.gold+=100},flag:1},
+  // Time
+  {id:'t1',c:'time',n:'Night Watch',i:'🌙',u:150,v:0,cost:3,l:['origin'],d:'+5% offline progress rate',flag:1},
+  {id:'t2',c:'time',n:'Long Night',i:'🌌',u:240,v:-60,cost:5,l:['t1'],d:'+4h offline cap',flag:1},
+  {id:'t3',c:'time',n:'Astral Haste',i:'🌀',u:240,v:60,cost:6,l:['t1'],d:'+10% speed for all actions',ap:d=>{d.actSpeed+=10}},
+  {id:'t4',c:'time',n:'Dawnkeeper',i:'🌅',u:330,v:-70,cost:6,l:['t2'],goal:G_('Reach a 5-day daily streak',S=>(S.daily.best||S.daily.streak||0)>=5,S=>[Math.min(5,S.daily.best||S.daily.streak||0),5]),d:'+150 double-AP actions per day',ap:d=>{d.dailyCap+=150}},
+  {id:'t5',c:'time',n:'Astral Familiar',i:'🦉',u:330,v:70,cost:25,l:['t3'],d:'+1 action slot at 100% speed',flag:1},
+  {id:'tc',c:'time',n:'Timeless',i:'⏳',u:440,v:0,cap:1,l:['t4','t5'],d:'+10% offline rate, +6h offline cap, +10% action speed',ap:d=>{d.actSpeed+=10},flag:1},
+  // Lineage
+  {id:'l1',c:'lineage',n:'Wisdom of Ages',i:'📚',u:150,v:0,cost:2,l:['origin'],d:'+25% class XP',ap:d=>{d.xp+=25}},
+  {id:'l2',c:'lineage',n:'Prodigy',i:'🎓',u:240,v:-60,cost:6,l:['l1'],d:'+1 bonus skill point every 10 class levels',flag:1},
+  {id:'l3',c:'lineage',n:'Bloodline',i:'🩸',u:240,v:60,cost:8,l:['l1'],d:'Keep 10% of class levels when you Ascend',flag:1},
+  {id:'l4',c:'lineage',n:'Polymath',i:'🧩',u:330,v:-70,cost:8,l:['l2'],goal:G_('Reach level 20 in 3 classes',S=>c20(S)>=3,S=>[Math.min(3,c20(S)),3]),d:'+50% class AP',flag:1},
+  {id:'l5',c:'lineage',n:'Ancestral Memory',i:'🧬',u:330,v:70,cost:15,l:['l3'],goal:G_('Reach class level 40',S=>Object.values(S.classes).some(c=>c.lvl>=40)||(S.stats.clsBest||0)>=40,S=>[Math.min(40,Math.max(S.stats.clsBest||0,...Object.values(S.classes).map(c=>c.lvl))),40]),d:'Keep 20% of class levels when you Ascend',flag:1},
+  {id:'lc',c:'lineage',n:'Legend Reborn',i:'🌠',u:440,v:0,cap:1,l:['l4','l5'],d:'+50% class XP · keep 30% of class levels',ap:d=>{d.xp+=50},flag:1},
+  // Wilds
+  {id:'g1',c:'wilds',n:'Gatherer’s Memory',i:'🧺',u:150,v:0,cost:4,l:['origin'],d:'Keep 35% of Mining, Herbalism and Fishing levels when you Ascend',flag:1},
+  {id:'g2',c:'wilds',n:'Deep Veins',i:'⛏️',u:240,v:-80,cost:5,l:['g1'],goal:plv('mining',40),d:'Deepcore Ore & Star Iron drop 1.5× as often · +15% Mining speed',flag:1},
+  {id:'g3',c:'wilds',n:'Green Thumb',i:'🌱',u:260,v:0,cost:5,l:['g1'],goal:plv('herbalism',40),d:'+1 garden plot · +15% Herbalism speed',flag:1},
+  {id:'g4',c:'wilds',n:'Leviathan’s Lure',i:'🎣',u:240,v:80,cost:8,l:['g1'],goal:plv('fishing',50),d:'Frostscale Pearls & Abyssal Essence drop 2× as often · +15% Fishing speed',flag:1},
+  {id:'g5',c:'wilds',n:'Wild Memory',i:'🍃',u:360,v:-50,cost:12,l:['g2','g3'],d:'Keep 50% of gathering levels when you Ascend',flag:1},
+  {id:'gc',c:'wilds',n:'Heart of the Wild',i:'🌳',u:450,v:20,cap:1,l:['g5','g4'],d:'+25% gathering speed & XP · keep 60% of gathering levels',flag:1},
+  // Workshop
+  {id:'k1',c:'workshop',n:'Artisan’s Memory',i:'🛠️',u:150,v:0,cost:4,l:['origin'],d:'Keep 35% of Smithing, Alchemy, Cooking and Enchanting levels when you Ascend',flag:1},
+  {id:'k2',c:'workshop',n:'Masterwork',i:'⚒️',u:230,v:-90,cost:5,l:['k1'],goal:plv('smithing',30),d:'Forged Masterwork (+1 rarity) chance 5% → 15%',flag:1},
+  {id:'k3',c:'workshop',n:'Long Brew',i:'⚗️',u:250,v:-25,cost:6,l:['k1'],goal:plv('alchemy',45),d:'Elixirs last twice as long',flag:1},
+  {id:'k4',c:'workshop',n:'Head Chef',i:'🍳',u:250,v:40,cost:6,l:['k1'],goal:G_('Cook a Hero’s Banquet',S=>(S.ps.cooking.count.banquet||0)+((S.stats.banquets)||0)>0,S=>[Math.min(1,(S.ps.cooking.count.banquet||0)+(S.stats.banquets||0)),1]),d:'Meals last twice as long',flag:1},
+  {id:'k5',c:'workshop',n:'Runesmith',i:'🔮',u:230,v:100,cost:8,l:['k1'],goal:G_('Enchant an item to +10',S=>S.stats.maxEnch>=10,S=>[Math.min(10,S.stats.maxEnch),10]),d:'+10% enchant success',ap:d=>{d.enchSucc=(d.enchSucc||0)+10}},
+  {id:'k6',c:'workshop',n:'Guild Memory',i:'🏗️',u:350,v:0,cost:12,l:['k2','k3','k4','k5'],d:'Keep 50% of crafting levels when you Ascend',flag:1},
+  {id:'kc',c:'workshop',n:'Grand Workshop',i:'🏰',u:450,v:0,cap:1,l:['k6'],d:'+25% crafting speed & XP · keep 60% of crafting levels',flag:1},
+  // Mystic Court
+  {id:'m1',c:'court',n:'Court Memory',i:'🪶',u:150,v:0,cost:4,l:['origin'],d:'Keep 35% of Summoning, Dancing, Praying, Advising and Bard levels when you Ascend',flag:1},
+  {id:'m2',c:'court',n:'Soulbinder',i:'🔯',u:230,v:-120,cost:6,l:['m1'],goal:plv('summoning',45),d:'+2 Bestiary slots',flag:1},
+  {id:'m3',c:'court',n:'Prima',i:'💃',u:255,v:-60,cost:6,l:['m1'],goal:plv('dancing',45),d:'Grace lasts up to 2h and is 25% stronger',flag:1},
+  {id:'m4',c:'court',n:'Devout',i:'🙏',u:265,v:0,cost:6,l:['m1'],goal:plv('praying',40),d:'+50% Favor from prayers',flag:1},
+  {id:'m5',c:'court',n:'Royal Ear',i:'📜',u:255,v:60,cost:6,l:['m1'],goal:plv('advising',40),d:'+50% Reputation from good counsel',flag:1},
+  {id:'m6',c:'court',n:'Virtuoso',i:'🎻',u:230,v:120,cost:6,l:['m1'],goal:plv('bard',35),d:'Anthem effect +25%',flag:1},
+  {id:'m7',c:'court',n:'Court Chronicle',i:'🗝️',u:360,v:0,cost:12,l:['m2','m3','m4','m5','m6'],d:'Keep 50% of Court levels when you Ascend',flag:1},
+  {id:'mc',c:'court',n:'Court of Stars',i:'🌟',u:460,v:0,cap:1,l:['m7'],d:'+25% Court profession speed & XP · keep 60% of their levels',flag:1},
+  // Fate
+  {id:'r1',c:'fate',n:'Relic Sense',i:'🧭',u:150,v:0,cost:4,l:['origin'],d:'+25% relic odds',ap:d=>{d.relicLuck+=25}},
+  {id:'r2',c:'fate',n:'Starlight Harvest',i:'✨',u:240,v:-60,cost:5,l:['r1'],d:'+20% Stardust from Ascending',flag:1},
+  {id:'r3',c:'fate',n:'Relic Sense II',i:'🔭',u:240,v:60,cost:8,l:['r1'],d:'+25% relic odds',ap:d=>{d.relicLuck+=25}},
+  {id:'r4',c:'fate',n:'Saga Keeper',i:'📜',u:330,v:-70,cost:10,l:['r2'],goal:G_('Ascend 3 times',S=>S.ascensions>=3,S=>[Math.min(3,S.ascensions),3]),d:'+20% Stardust from Ascending',flag:1},
+  {id:'r5',c:'fate',n:'Fate Seer',i:'🔮',u:330,v:70,cost:12,l:['r3'],goal:G_('Find 3 relics',S=>Object.keys(S.relics).length>=3,S=>[Math.min(3,Object.keys(S.relics).length),3]),d:'+50% relic odds',ap:d=>{d.relicLuck+=50}},
+  {id:'rc',c:'fate',n:'Loom of Fate',i:'🕸️',u:440,v:0,cap:1,l:['r4','r5'],d:'+100% relic odds · +30% Stardust',ap:d=>{d.relicLuck+=100},flag:1},
+];
+(function(){const cs={};for(const c of D.CONST)cs[c.id]=c;
+  for(const n of D.STARS){if(!n.c){n.x=0;n.y=0;continue}const a=cs[n.c].a*Math.PI/180;n.x=Math.round(Math.cos(a)*n.u-Math.sin(a)*n.v);n.y=Math.round(Math.sin(a)*n.u+Math.cos(a)*n.v)}
+  D.STAR={};for(const n of D.STARS)D.STAR[n.id]=n;
+  D.STAR_LINKS=[];for(const n of D.STARS)for(const m of (n.l||[])){D.STAR_LINKS.push([m,n.id])}
+  // adjacency both ways
+  for(const n of D.STARS)n.adj=[];for(const [a,b] of D.STAR_LINKS){D.STAR[a].adj.push(b);D.STAR[b].adj.push(a)}
+})();
+// v2 Ascension shop (kept only so old saves can be refunded)
+D.ASTRAL_OLD=D.ASTRAL;
