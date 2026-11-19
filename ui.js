@@ -612,7 +612,7 @@ const A={
   rename:()=>{const n=prompt('Hero name',S().name);if(n)S().name=n.slice(0,18)},
   hardReset:()=>{if(confirm('Erase ALL progress, including relics and ascension? This cannot be undone.')&&confirm('Really erase everything?')){localStorage.removeItem(SAVE_KEY);G.S=newState();syncSlots();G.h=null;G.cb=null;recalc();showIntro();renderPanel(true)}},
 };
-document.addEventListener('click',ev=>{const el=ev.target.closest('[data-a]');if(!el)return;if(el.classList.contains('dis'))return;const f=A[el.dataset.a];if(f){f(el.dataset);renderTop();renderSlots();if(!$('#modal').contains(el)||el.dataset.a!=='lock')renderPanel(true)}});
+document.addEventListener('click',ev=>{let el=ev.target.closest('[data-a]');if(el&&el.classList.contains('mat')&&!ev.target.closest('.mq')){const outer=el.parentElement&&el.parentElement.closest('[data-a]');if(outer)el=outer}if(!el)return;if(el.classList.contains('dis'))return;const f=A[el.dataset.a];if(f){f(el.dataset);renderTop();renderSlots();if(!$('#modal').contains(el)||el.dataset.a!=='lock')renderPanel(true)}});
 document.addEventListener('input',ev=>{const k=ev.target.dataset&&ev.target.dataset.in;if(!k)return;const v=+ev.target.value;if(k==='smithTarget')S().ps.smithing.target=v;if(k==='quaffAt')S().settings.quaffAt=v;UI.busyInput=true});
 document.addEventListener('change',ev=>{if(ev.target.dataset&&ev.target.dataset.sel==='sumRole'){const su=S().summons.find(x=>x.uid==ev.target.dataset.uid);if(su){su.role=ev.target.value;G.dirty=true}renderPanel(true);return}if(ev.target.dataset&&ev.target.dataset.in){UI.busyInput=false;renderPanel(true)}});
 document.addEventListener('pointerup',()=>{if(UI.busyInput)setTimeout(()=>{UI.busyInput=false},50)});
