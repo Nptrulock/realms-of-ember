@@ -388,6 +388,7 @@ function summonCap(){return 1+Math.floor(G.S.profs.summoning.lvl/12)+(relicMod('
 function summonWork(p){let w=0;const sm=relicMod('summonMult')||1;for(const su of G.S.summons)if(su.role===p)w+=su.power*3*sm;return w}
 function favorTier(f){return Math.min(10,Math.floor(Math.log2(f/10+1)))}
 function hasMats(inp,n=1){const S=G.S;for(const k in inp)if((S.mats[k]||0)<inp[k]*n)return false;return true}
+function needTxt(inp){const S=G.S;const m=Object.entries(inp).filter(([k,n])=>(S.mats[k]||0)<n).map(([k,n])=>`${D.MATS[k].i} ${D.MATS[k].n} ${fmt(Math.floor(S.mats[k]||0))}/${n}`);return 'Need '+m.join(', ')}
 function useMats(inp){const S=G.S;for(const k in inp)S.mats[k]-=inp[k]}
 function enchCost(it){return Math.ceil(5*Math.pow(1.45,it.ench||0)*(1+it.il/15))}
 function enchChance(it){const S=G.S,lv=S.profs.enchanting.lvl,d=G.d;return Math.max(3,Math.min(95,70-(it.ench||0)*8+lv*.5+pm('enchanting','steady')*1.5+(d.profSucc||0)+(S.relics.rune?25:0)+(d.enchSucc||0)))}
@@ -422,7 +423,7 @@ function profTick(si,dt){
       profDone('mining',ok,nd.lv,nd.t)}return}
   if(p==='smithing'){const ss=S.ps.smithing,t=D.PROFS.smithing.tiers.find(x=>x.id===ss.tier);if(!t||t.lv>lv){sl.note='Level too low';return}
     const inp=smithCost(t,ss.slot);
-    if(!sl.busy){if(!hasMats(inp)){sl.note='Need materials';sl.heat=Math.max(0,sl.heat-dt*10);return}useMats(inp);sl.busy=1;sl.heat=0}
+    if(!sl.busy){if(!hasMats(inp)){sl.note=needTxt(inp);sl.heat=Math.max(0,sl.heat-dt*10);return}useMats(inp);sl.busy=1;sl.heat=0}
     sl.heat+=dt*5*sp;sl.prog=Math.min(1,sl.heat/ss.target);
     if(sl.heat>=ss.target){sl.busy=0;sl.heat=0;sl.prog=0;const ok=!chance(crackChance(ss.target));profDone('smithing',ok,t.lv,ss.target/5+3);
       if(!ok){emit({t:'crack',si});return}
@@ -432,7 +433,7 @@ function profTick(si,dt){
       emit({t:'forge',si})}
     return}
   if(p==='alchemy'){const as=S.ps.alchemy,rc=D.PROFS.alchemy.recipes.find(x=>x.id===as.recipe);if(!rc||rc.lv>lv){sl.note='Level too low';return}
-    if(!sl.busy){if(!hasMats(rc.in)){sl.note='Need ingredients';return}useMats(rc.in);sl.busy=1;sl.prog=0}
+    if(!sl.busy){if(!hasMats(rc.in)){sl.note=needTxt(rc.in);return}useMats(rc.in);sl.busy=1;sl.prog=0}
     if(timed(sl,dt,sp,8)){sl.busy=0;const ok=chance(profSucc('alchemy',rc.lv));profDone('alchemy',ok,rc.lv,8);if(!ok){emit({t:'fizzle',si});return}
       const m=as.mastery[rc.id]||0;let n=(1+(chance(m/200)?1:0)+bountyRoll('alchemy'))*(relicMod('craftMult')||1);
       if(rc.mat){addMat(rc.mat,n);log(`${rc.i} Brewed ${n>1?n+'× ':''}<b>${rc.n}</b>`,'prof')}else if(rc.pot)S.potions[rc.pot]=(S.potions[rc.pot]||0)+n;else S.elixirs[rc.id]=(S.elixirs[rc.id]||0)+n;
@@ -440,20 +441,20 @@ function profTick(si,dt){
       if(chance(.04)){const el=pick(D.PROFS.alchemy.recipes.filter(x=>x.elix));S.elixirs[el.id]=(S.elixirs[el.id]||0)+1;log(`💥 Volatile reaction! Bonus ${el.n}.`,'prof')}
       emit({t:'brew',si})}return}
   if(p==='cooking'){const cs=S.ps.cooking,rc=D.PROFS.cooking.recipes.find(x=>x.id===cs.recipe);if(!rc||rc.lv>lv){sl.note='Level too low';return}
-    if(!sl.busy){if(!hasMats(rc.in)){sl.note='Need ingredients';return}useMats(rc.in);sl.busy=1;sl.prog=0}
+    if(!sl.busy){if(!hasMats(rc.in)){sl.note=needTxt(rc.in);return}useMats(rc.in);sl.busy=1;sl.prog=0}
     if(timed(sl,dt,sp,10)){sl.busy=0;const diff=lv-rc.lv;const ok=chance(profSucc('cooking',rc.lv));const perf=Math.min(.3,Math.max(0,diff*.015));profDone('cooking',ok,rc.lv,10);
       if(!ok){emit({t:'burn',si});return}
       const n=(relicMod('craftMult')||1)*(1+bountyRoll('cooking'));if(chance(perf))S.foodP[rc.id]=(S.foodP[rc.id]||0)+n;else S.food[rc.id]=(S.food[rc.id]||0)+n;
       const c=(cs.count[rc.id]||0)+1;cs.count[rc.id]=c;if(c===25||c===100||c===500){log(`👨‍🍳 Signature ${rc.n} tier ${c===25?1:c===100?2:3} earned!`,'prof');G.dirty=true}
       emit({t:'cook',si})}return}
   if(p==='enchanting'){const es=S.ps.enchanting,it=S.equip[es.slot];if(!it){sl.note='Nothing equipped';return}if((it.ench||0)>=15){sl.note='Maxed at +15';return}
-    const cost=enchCost(it);if(!sl.busy){if((S.mats.dust||0)<cost){sl.note='Need Arcane Dust';return}S.mats.dust-=cost;sl.busy=1;sl.prog=0}
+    const cost=enchCost(it);if(!sl.busy){if((S.mats.dust||0)<cost){sl.note=`Need ✨ Arcane Dust ${fmt(S.mats.dust||0)}/${fmt(cost)} — salvage gear`;return}S.mats.dust-=cost;sl.busy=1;sl.prog=0}
     if(timed(sl,dt,sp,12)){sl.busy=0;const ok=chance(enchChance(it)/100);profDone('enchanting',ok,Math.max(1,it.il/2+(it.ench||0)*2),12);
       if(ok){it.ench=(it.ench||0)+1;S.stats.maxEnch=Math.max(S.stats.maxEnch,it.ench);G.dirty=true;emit({t:'ench',ok:1,si});if(it.ench>=5)log(`🔮 ${it.n} enchanted to +${it.ench}!`,'prof')}
       else{emit({t:'ench',ok:0,si});if(it.ench>=5&&!S.relics.rune){const gems=Object.keys(S.mats).filter(k=>D.MATS[k]&&D.MATS[k].gem&&S.mats[k]>0);
         if(es.ward&&gems.length){S.mats[gems[0]]--;}else{it.ench--;G.dirty=true;log(`🔮 Enchant failed — ${it.n} dropped to +${it.ench}.`,'prof')}}}}return}
   if(p==='summoning'){const ss=S.ps.summoning,sd=D.SUMMONS.find(x=>x.id===ss.target);if(!sd||sd.lv>lv){sl.note='Level too low';return}
-    if(!sl.busy){if(!hasMats(sd.in)){sl.note='Need materials';return}useMats(sd.in);sl.busy=1;sl.prog=0}
+    if(!sl.busy){if(!hasMats(sd.in)){sl.note=needTxt(sd.in);return}useMats(sd.in);sl.busy=1;sl.prog=0}
     if(timed(sl,dt,sp,sd.t)){sl.busy=0;const ok=chance(profSucc('summoning',sd.lv));profDone('summoning',ok,sd.lv,sd.t);
       if(!ok){emit({t:'fail',si});return}
       uniqueRoll('summoning',sd.lv);const su={uid:S.nextId++,type:sd.id,power:Math.round(sd.power*(1+lv*.02)*100)/100,role:'fight'};

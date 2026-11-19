@@ -335,13 +335,43 @@ function profUnlocks(p){const s=S(),lv=s.profs[p].lvl;const rows=[];const ok=x=>
   if(p==='smithing')for(const r in D.INFUSE){const f=D.INFUSE[r];const el=[...Object.values(s.equip).filter(Boolean).map(it=>[it,1]),...s.inv.map(it=>[it,0])].filter(([it])=>it.r==r).sort((a,b)=>b[0].il-a[0].il).slice(0,3);
     rows.push(`<div class="unl ${lv>=f.lv?'':'off'}"><b>${ok(f.lv)} Lv ${f.lv} · Infusion: <span class="r${r}">${D.RARITIES[r].name}</span> → <span class="r${f.to}">${D.RARITIES[f.to].name}</span></b><div class="small">Power ×${D.RARITIES[r].mult} → ×${D.RARITIES[f.to].mult}, +1 affix${f.to>=4?', + legendary power':''}. ${matsHave(f.in)}${f.star?` · needs ${D.STAR[f.star].i} ${D.STAR[f.star].n} ${star(f.star)?'✅':'🔒'}`:''}</div>
     ${el.length?`<div class="row">${el.map(([it,eq])=>btn('item',`${eq?'🎽':''}${itemIcon(it)} <span class="r${it.r}">${esc(it.n.slice(0,26))}</span>`,{data:{id:it.id,eq},cls:'sm'})).join('')}</div>`:`<div class="small muted">No ${D.RARITIES[r].name} items on hand.</div>`}</div>`)}
-  if(p==='enchanting')for(const k of D.KEYS){const ki=keyInfo(k);rows.push(`<div class="unl ${lv>=k.lv?'':'off'}"><b>${ki.done?'✅':ok(k.lv)} Lv ${k.lv} · ${k.i} ${k.n}</b> — ${k.d}<div class="small">${ki.done?'Attuned forever (kept through Ascension).':matsHave(k.in)}</div>${ki.done?'':btn('craftKey',`${k.i} Craft`,{data:{id:k.id},cls:'gold sm',dis:!ki.ok})}</div>`)}
+  if(p==='enchanting')for(const k of D.KEYS){const ki=keyInfo(k);rows.push(`<div class="unl ${lv>=k.lv?'':'off'}"><b>${ki.done?'✅':ok(k.lv)} Lv ${k.lv} · ${k.i} ${k.n}</b> — ${k.d}<div class="small">${ki.done?'Attuned forever (kept through Ascension).':matsHave(k.in)}</div>${ki.done?'':btn('craftKey',`${k.i} Craft`,{data:{id:k.id},cls:'gold sm',dis:!ki.ok})+(ki.ok?'':` <span class="small r5">${lv<k.lv?`Needs Enchanting ${k.lv}. `:''}${hasMats(k.in)?'':needTxt(k.in)}</span>`)}</div>`)}
   const goals=D.STARS.filter(n=>n.goal&&n.goal.d.toLowerCase().includes(D.PROFS[p].n.toLowerCase()));
   for(const n of goals)rows.push(`<div class="unl ${s.stars[n.id]?'':'off'}"><b>${s.stars[n.id]?'✅':'🌌'} Star: ${n.i} ${n.n}</b><div class="small">${esc(n.goal.d)} → ${esc(n.d)}</div></div>`);
   if(!rows.length)return '';
   return `<h3>🔓 Unlocks & reagents</h3><div class="card unlocks">${rows.join('')}</div>`}
 function selCard(a,data,sel,lock,inner){const attrs=Object.entries(data).map(([k,v])=>`data-${k}="${v}"`).join(' ');return `<div class="card ${sel?'sel':''} ${lock?'locked':''}" ${lock?'':`data-a="${a}" ${attrs}`} style="cursor:pointer">${inner}</div>`}
-function matsHave(inp){const s=S();return Object.entries(inp).map(([k,n])=>`<span class="${(s.mats[k]||0)>=n?'':'r5'}">${D.MATS[k].i}${n} <span class="muted">(${fmt(s.mats[k]||0)})</span></span>`).join(' ')}
+function num(n){n=Math.floor(n||0);return n<1e6?n.toLocaleString('en-US'):fmt(n)}
+function matChip(k,need){const s=S(),m=D.MATS[k],have=s.mats[k]||0;const ok=need==null||have>=need;
+  return `<button class="mat ${need==null?'':ok?'ok':'miss'}" data-a="matInfo" data-k="${k}" title="${esc(m.n)} — where to get: ${esc(matSources(k).map(x=>x.replace(/<[^>]+>/g,'')).join(' | '))}">${m.i} ${esc(m.n)} <b>${num(have)}${need==null?'':' / '+num(need)}</b><span class="mq">?</span></button>`}
+function matsHave(inp){return `<span class="mats">${Object.entries(inp).map(([k,n])=>matChip(k,n)).join('')}</span>`}
+const GEMS=['amethyst','ruby','sapphire','emerald','diamond'];
+function matSources(k){const out=[],m=D.MATS[k];if(!m)return out;
+  D.ZONES.forEach(z=>{if(z.mat===k)out.push(`${z.i} Monsters in <b>${z.n}</b> (Lv ${z.min}–${z.max}): 15% per kill, elites 1–3, the boss 4–7`)});
+  if(k==='meat')out.push('⚔️ 25% from any beast or humanoid kill (not undead, constructs, oozes or elementals). Bosses drop 5.');
+  if(k==='dust')out.push(`🧹 <b>Salvage gear</b>: Inventory → tap an item → Salvage, or the bulk “Salvage ≤” buttons. Rarer, higher-level gear gives much more (an Epic il 40 ≈ ${num(itemDust({r:3,il:40}))}, a Rare il 40 ≈ ${num(itemDust({r:2,il:40}))}).`,'🧾 The Loot Filter (Town) can auto-salvage drops of chosen rarities.','⚠️ Enchanting spends dust on every attempt while it is assigned.');
+  const mn=D.PROFS.mining.nodes.find(n=>n.id===k);if(mn)out.push(`⛏️ <b>Mining</b> Lv ${mn.lv}+: work the ${m.n} vein`);
+  const gm=D.PROFS.mining.nodes.find(n=>n.gem===k);if(gm){const gi=GEMS.indexOf(k),zi=Math.ceil(gi*1.6);out.push(`⛏️ <b>Mining</b> the ${D.MATS[gm.id].n} vein (Lv ${gm.lv}+): ~1–3% per successful swing`);out.push(`⚔️ Rare monster drop (0.4% per kill, elites 5×, bosses 25×) in ${D.ZONES[zi].i} ${D.ZONES[zi].n} or later zones`)}
+  const hb=D.PROFS.herbalism.seeds.find(n=>n.id===k);if(hb)out.push(`🌿 <b>Herbalism</b> Lv ${hb.lv}+: plant ${m.n} in your garden (Professions → Herbalism)`);
+  if(k==='fish')out.push('🎣 <b>Fishing</b> at any spot: 1–6 fish per catch (deeper spots give more)');
+  const u=D.UNIQUE.find(x=>x.id===k);if(u)out.push(`${D.PROFS[u.p].i} <b>${D.PROFS[u.p].n}</b> Lv ${u.lv}+: ${(uniqueChance(u)*100).toFixed(u.ch<.1?1:0)}% per ${u.routine?'finished routine':'successful action'} at ${u.at}`);
+  const rc=D.PROFS.alchemy.recipes.find(x=>x.mat===k);if(rc)out.push(`⚗️ <b>Alchemy</b> Lv ${rc.lv}: brew ${rc.i} ${rc.n} from ${Object.entries(rc.in).map(([q,n])=>n+' '+D.MATS[q].n).join(' + ')}`);
+  if(!out.length)out.push('Unknown source');return out}
+function matUses(k){const out=(D.USED_IN[k]||[]).slice();const add=t=>{if(!out.includes(t))out.push(t)};
+  for(const rc of D.PROFS.alchemy.recipes)if(rc.in[k])add(`⚗️ ${rc.n} (Alchemy ${rc.lv})`);
+  for(const rc of D.PROFS.cooking.recipes)if(rc.in[k])add(`🍳 ${rc.n} (Cooking ${rc.lv})`);
+  for(const t of D.PROFS.smithing.tiers)if(t.ore===k||t.mat===k)add(`⚒️ ${t.n} gear (Smithing ${t.lv})`);
+  for(const sd of D.SUMMONS)if(sd.in[k])add(`🔯 ${sd.n} (Summoning ${sd.lv})`);
+  if(k==='dust')add('🔮 Enchanting attempts and zone keys');if(m_gem(k))add('🔮 Enchanting wards (saves an item from losing a + on failure)');
+  return out}
+function m_gem(k){return D.MATS[k]&&D.MATS[k].gem}
+function matInfoHtml(k){const s=S(),m=D.MATS[k];const src=matSources(k),use=matUses(k);
+  return `<div class="hd row"><span style="font-size:36px">${m.i}</span><div><b style="font-size:17px">${esc(m.n)}</b><div class="muted">You have <b>${num(s.mats[k]||0)}</b></div></div></div>
+  <h3>📍 Where to get it</h3><ul class="small srcl">${src.map(x=>`<li>${x}</li>`).join('')}</ul>
+  <h3>🧪 Used in</h3><ul class="small srcl">${use.map(x=>`<li>${x}</li>`).join('')||'<li class="muted">Nothing yet</li>'}</ul>`}
+function itemGuide(){const s=S();const cat=k=>{const m=D.MATS[k];if(D.UNIQUE.find(u=>u.id===k))return 'Rare profession reagents';if(D.PROFS.alchemy.recipes.find(r=>r.mat===k))return 'Crafted reagents';if(D.ZONES.some(z=>z.mat===k)||k==='meat')return 'Monster drops';if(m.gem||D.PROFS.mining.nodes.some(n=>n.id===k))return 'Ores & gems';if(D.PROFS.herbalism.seeds.some(n=>n.id===k))return 'Herbs';return 'Other'};
+  const groups={};for(const k in D.MATS)(groups[cat(k)]=groups[cat(k)]||[]).push(k);
+  return ['Monster drops','Ores & gems','Herbs','Other','Rare profession reagents','Crafted reagents'].filter(g=>groups[g]).map(g=>`<h4>${g}</h4><div class="guide">${groups[g].map(k=>`<div class="gi ${(s.mats[k]||0)>0?'':'none'}">${matChip(k)}<div class="small muted">${matSources(k)[0]}</div></div>`).join('')}</div>`).join('')}
 function succ(p,req){const v=profSucc(p,req);return `<span class="${v<.5?'r5':v>.85?'r1':''}">✔ ${(v*100).toFixed(0)}%</span>`}
 function profDetail(p){const s=S(),lv=s.profs[p].lvl;let h=profUnlocks(p);return profDetailBase(p,lv)+h}
 function profDetailBase(p,lv){const s=S();let h='';
@@ -355,7 +385,7 @@ function profDetailBase(p,lv){const s=S();let h='';
     <h3>Strike temperature: ${ss.target}°</h3><input type="range" min="40" max="100" value="${ss.target}" data-in="smithTarget">
     <div class="row small"><span>Crack chance: <b class="${cr>.1?'r5':''}">${(cr*100).toFixed(1)}%</b></span><span>Quality bonus: <b class="r3">+${Math.round((ss.target-40)*3+lv*1.5)}% rarity</b></span><span>Time: ${(ss.target/12).toFixed(1)}s</span></div>
     <p class="small">Cost: ${matsHave(smithCost(t,ss.slot))} · Forged items are at least Uncommon, 5% Masterwork (+1 rarity).</p>`}
-  if(p==='alchemy'){const as=s.ps.alchemy;h=`<h3>Recipes</h3><div class="grid" style="--min:200px">${D.PROFS.alchemy.recipes.map(r=>{const m=as.mastery[r.id]||0;return selCard('setAlch',{id:r.id},as.recipe===r.id,lv<r.lv,`<b>${r.i} ${r.n}</b><div class="small">Lv ${r.lv} · ${succ('alchemy',r.lv)} · ${r.pot?`heals ${Math.round(r.heal*100*(1+m/200))}%`:Object.entries(r.elix).map(([k,v])=>`+${Math.round(v*(1+m/200))}% ${k}`).join(', ')+` · 5 min`}<br>${matsHave(r.in)}<br>Owned: ${r.pot?(s.potions[r.pot]||0):(s.elixirs[r.id]||0)}</div><div class="small">Mastery ${m}/100</div>${bar(m/100,'xpfill')}`)}).join('')}</div>`}
+  if(p==='alchemy'){const as=s.ps.alchemy;h=`<h3>Recipes</h3><div class="grid" style="--min:200px">${D.PROFS.alchemy.recipes.map(r=>{const m=as.mastery[r.id]||0;return selCard('setAlch',{id:r.id},as.recipe===r.id,lv<r.lv,`<b>${r.i} ${r.n}</b><div class="small">Lv ${r.lv} · ${succ('alchemy',r.lv)} · ${r.pot?`heals ${Math.round(r.heal*100*(1+m/200))}%`:r.mat?`<span class="usedin">Reagent → ${(D.USED_IN[r.mat]||[]).join(' · ')}</span>`:Object.entries(r.elix||{}).map(([k,v])=>`+${Math.round(v*(1+m/200))}% ${k}`).join(', ')+` · 5 min`}<br>${matsHave(r.in)}<br>Owned: ${r.mat?(s.mats[r.mat]||0):r.pot?(s.potions[r.pot]||0):(s.elixirs[r.id]||0)}</div><div class="small">Mastery ${m}/100</div>${bar(m/100,'xpfill')}`)}).join('')}</div>`}
   if(p==='cooking'){const cs=s.ps.cooking;h=`<h3>Recipes</h3><div class="grid" style="--min:200px">${D.PROFS.cooking.recipes.map(r=>{const c=cs.count[r.id]||0,diff=lv-r.lv,burn=1-profSucc('cooking',r.lv),perf=Math.min(.3,Math.max(0,diff*.015));const tier=c>=500?3:c>=100?2:c>=25?1:0;
     return selCard('setCook',{id:r.id},cs.recipe===r.id,lv<r.lv,`<b>${r.i} ${r.n}</b><div class="small">Lv ${r.lv} · ${Object.entries(r.buff).map(([k,v])=>`+${v}% ${k}`).join(', ')} · 10 min<br>${matsHave(r.in)}<br>🔥 burn ${(burn*100).toFixed(0)}% · ✨ perfect ${(perf*100).toFixed(0)}%<br>Signature ${'★'.repeat(tier)}${'☆'.repeat(3-tier)} (${c}/${tier>=3?500:[25,100,500][tier]}) · Owned ${(s.food[r.id]||0)}+${(s.foodP[r.id]||0)}✨</div>`)}).join('')}</div>`}
   if(p==='enchanting'){const es=s.ps.enchanting;h=`<h3>Target (equipped item) · ✨ Dust: ${fmt(s.mats.dust||0)}</h3><div class="grid" style="--min:170px">${D.SLOTS.map(sl=>{const it=s.equip[sl];return selCard('setEnch',{sl},es.slot===sl,!it,it?`<b class="r${it.r}">${D.SLOT_ICON[sl]} ${D.SLOT_NAME[sl]} +${it.ench||0}</b><div class="small">${esc(it.n)}<br>${it.ench>=15?'MAX':`Cost ✨${fmt(enchCost(it))} · ${enchChance(it).toFixed(0)}% success`}</div>`:`<b>${D.SLOT_NAME[sl]}</b><div class="small">empty</div>`)}).join('')}</div>
@@ -381,8 +411,8 @@ P.inv=()=>{const s=S();const items=s.inv.slice().sort((a,b)=>UI.invSort==='r'?(b
   const tiles=items.map(it=>`<div class="item rr${it.r} ${isUpgradeCached(it)?'up':''} ${s.locked[it.id]?'lockd':''}" style="--rc:${D.RARITIES[it.r].color}" data-a="item" data-id="${it.id}"><div class="ii">${itemIcon(it)}</div><div class="small r${it.r}" style="font-size:10px">${D.RARITIES[it.r].name}</div><div class="il">${D.SLOT_NAME[it.slot]} · il ${it.il}</div>${it.ench?`<span class="en">+${it.ench}</span>`:''}<button class="lkb" data-a="tileLock" data-id="${it.id}" aria-label="${s.locked[it.id]?'Unlock':'Lock'}">${s.locked[it.id]?'🔒':'🔓'}</button></div>`).join('');
   const cnt=D.RARITIES.map((_,r)=>s.inv.filter(it=>it.r===r&&!s.locked[it.id]).length),nl=s.inv.filter(it=>s.locked[it.id]).length;
   const le=(r)=>cnt.slice(0,r+1).reduce((a,b)=>a+b,0);
-  const mats=Object.keys(D.MATS).filter(k=>(s.mats[k]||0)>0&&!D.MATS[k].u).map(k=>`<span class="pill">${D.MATS[k].i} ${D.MATS[k].n} <b>${fmt(s.mats[k])}</b></span>`).join(' ');
-  const reag=Object.keys(D.MATS).filter(k=>D.MATS[k].u&&(s.mats[k]||0)>0).map(k=>`<div class="card reag"><b>${D.MATS[k].i} ${D.MATS[k].n} ×${fmt(s.mats[k])}</b><div class="small muted">Used in: ${(D.USED_IN[k]||['—']).join(' · ')}</div></div>`).join('');
+  const mats=Object.keys(D.MATS).filter(k=>(s.mats[k]||0)>0&&!D.MATS[k].u).map(k=>matChip(k)).join('');
+  const reag=Object.keys(D.MATS).filter(k=>D.MATS[k].u&&(s.mats[k]||0)>0).map(k=>`<div class="card reag">${matChip(k)}<div class="small muted">Used in: ${(D.USED_IN[k]||['—']).join(' · ')}</div></div>`).join('');
   return `<h2>🎒 Inventory <span class="muted">${s.inv.length}/${invCap()}</span></h2>
   <div class="row">Sort: ${btn('sort','Rarity',{data:{k:'r'},cls:'sm'+(UI.invSort==='r'?' on':'')})}${btn('sort','Item level',{data:{k:'il'},cls:'sm'+(UI.invSort==='il'?' on':'')})}${btn('sort','Slot',{data:{k:'slot'},cls:'sm'+(UI.invSort==='slot'?' on':'')})}<span class="sp"></span>${btn('equipBest','🎽 Equip best',{cls:'sm green'})}</div>
   <div class="card bulkc"><div class="row"><b>🧹 Bulk</b><span class="muted small">Locked items (🔒 ${nl}) are never sold or salvaged. Epic and up ask first.</span></div>
@@ -392,7 +422,7 @@ P.inv=()=>{const s=S();const items=s.inv.slice().sort((a,b)=>UI.invSort==='r'?(b
   <div class="grid" style="--min:92px;margin-top:10px">${tiles||'<span class="muted">Empty. Monsters drop gear; Smithing forges it.</span>'}</div>
   ${oddsCard()}
   <h3>Reagents</h3>${reag?`<div class="grid" style="--min:230px">${reag}</div>`:'<p class="muted small">Rare reagents come from the hardest targets of each profession (see each profession’s “Unlocks” card).</p>'}
-  <h3>Materials</h3><div class="row">${mats||'<span class="muted">None yet.</span>'}</div><p class="muted">▲ = upgrade over what you wear. Tap 🔓 on a tile to lock it.</p>`;};
+  <h3>Materials</h3><div class="mats">${mats||'<span class="muted">None yet.</span>'}</div><p class="small muted">Tap any material to see where it comes from.</p><div style="margin-top:8px">${btn('guideToggle',UI.guideOpen?'▾ 📖 Item guide — every material and where to get it':'▸ 📖 Item guide — every material and where to get it',{cls:'sm gold'})}</div>${UI.guideOpen?`<div class="card" style="margin-top:6px">${itemGuide()}</div>`:''}<p class="muted">▲ = upgrade over what you wear. Tap 🔓 on a tile to lock it.</p>`;};
 function oddsCard(){const s=S(),mf=G.d.mf;const n=rarityOdds(mf),el=rarityOdds(mf,1),bo=rarityOdds(mf,1);
   const f=p=>p<=0?'<span class="muted">—</span>':`${p>=.1?(p*100).toFixed(1):p>=.01?(p*100).toFixed(2):(p*100).toPrecision(2)}%<div class="muted" style="font-size:10px">1 in ${fmt(Math.round(1/p))}</div>`;
   return `<div class="card oddc"><b>🎲 Drop odds</b> <span class="small muted">per item drop · your Magic Find ${fmt(Math.round(mf))}%</span>
@@ -404,7 +434,7 @@ function infuseBox(it,eq){const inf=infuseInfo(it);if(!inf)return '';const f=inf
   return `<div class="card infuse" style="margin-top:8px"><b>⚒️ Infuse: <span class="r${it.r}">${D.RARITIES[it.r].name}</span> → <span class="r${f.to}">${D.RARITIES[f.to].name}</span></b>
   <div class="small">Power ×${D.RARITIES[it.r].mult} → <b class="r${f.to}">×${D.RARITIES[f.to].mult}</b>, affixes ×${(D.RARITIES[f.to].am/D.RARITIES[it.r].am).toFixed(2)}, +${D.RARITIES[f.to].affixes-D.RARITIES[it.r].affixes} affix${f.to>=4?' and a legendary power':''}.</div>
   <div class="small">Needs Smithing ${f.lv}${f.star?` and the ${D.STAR[f.star].i} ${D.STAR[f.star].n} star`:''} · ${matsHave(f.in)}</div>
-  ${btn('infuse','⚒️ Infuse',{data:{id:it.id,eq:eq?1:0},cls:'gold sm',dis:!inf.ok})}${inf.ok?'':` <span class="small muted">Missing: ${inf.why.join(', ')}</span>`}</div>`}
+  ${btn('infuse','⚒️ Infuse',{data:{id:it.id,eq:eq?1:0},cls:'gold sm',dis:!inf.ok})}${inf.ok?'':` <span class="small r5">${inf.why.filter(w=>w!=='reagents').join(', ')}${hasMats(f.in)?'':' '+needTxt(f.in)}</span>`}</div>`}
 function itemModal(id,eq){const s=S();let it=eq?Object.values(s.equip).find(x=>x&&x.id==id):s.inv.find(x=>x.id==id);if(!it)return closeModal();UI.selItem=it.id;
   const b=itemBase(it);const cur=s.equip[it.slot];const em=1+.1*(it.ench||0);
   let cmp='';if(!eq){const now=G.d.power,nw=powerWith(it.slot,it),base=powerWith(it.slot,cur||null);const pct=(nw/base-1)*100;cmp=`<div class="small" style="margin:6px 0">Power if equipped: <b class="${pct>=0?'r1':'r5'}">${pct>=0?'+':''}${pct.toFixed(1)}%</b>${cur?` vs <span class="r${cur.r}">${esc(cur.n)}</span>`:''}</div>`;void now}
@@ -516,7 +546,7 @@ function goTab(t,dir){const i0=TABS.findIndex(x=>x[0]===UI.tab),i1=TABS.findInde
   if(window.innerWidth<=900){const r=$('#right');const y=r.getBoundingClientRect().top+window.scrollY-$('#top').offsetHeight-4;if(window.scrollY>y||r.getBoundingClientRect().top>window.innerHeight*.6)window.scrollTo({top:Math.max(0,y),behavior:'smooth'})}}
 function stepTab(d){const i=TABS.findIndex(x=>x[0]===UI.tab);const n=TABS[(i+d+TABS.length)%TABS.length][0];goTab(n,d>0?'slideL':'slideR')}
 function renderPanel(force){const pn=$('#panel');if(!force&&(UI.busyInput||pn.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName)))return;
-  const st=pn.scrollTop;if(force)pn._h=null;const h=P[UI.tab]();if(force||(!UI.ptrDown&&pn._h!==h)){pn._h=h;pn.innerHTML=h;if(UI.tab==='ascend')applyChart()}pn.scrollTop=st;UI.lastPanel=performance.now();if(force){const cc=pn.querySelector('.pgchips');if(cc)centerIn(cc,cc.querySelector('.pgc.on'))}if(UI.slide&&force){UI.slide=null;centerIn(pn.querySelector('.pgchips'),pn.querySelector('.pgc.on'))}renderTabs()}
+  const st=pn.scrollTop;if(force)pn._h=null;let h;try{h=P[UI.tab]()}catch(err){console.error(err);h=`<div class="card"><b>⚠️ This page hit an error</b><div class="small muted">${esc(String(err&&err.message||err))}</div><div class="small">Your save is safe. Please tell the developer.</div></div>`}if(force||(!UI.ptrDown&&pn._h!==h)){pn._h=h;pn.innerHTML=h;if(UI.tab==='ascend')applyChart()}pn.scrollTop=st;UI.lastPanel=performance.now();if(force){const cc=pn.querySelector('.pgchips');if(cc)centerIn(cc,cc.querySelector('.pgc.on'))}if(UI.slide&&force){UI.slide=null;centerIn(pn.querySelector('.pgchips'),pn.querySelector('.pgc.on'))}renderTabs()}
 
 /* ---------------- actions ---------------- */
 const A={
@@ -565,7 +595,8 @@ const A={
   craftKey:e=>{if(!craftKey(e.id))toast('Missing requirements')},
   star:e=>{UI.starSel=e.id},buyStar:e=>{if(!buyStar(e.id))toast('Not available yet')},
   starFocus:e=>focusConst(e.c),starZoom:e=>{const b=$('#starchart');if(!b)return;const r=b.getBoundingClientRect();zoomAt(r.left+r.width/2,r.top+r.height/2,+e.d)},starFit:()=>{SC.init=false;applyChart()},
-  keepToggle:()=>{UI.keepOpen=!UI.keepOpen},
+  keepToggle:()=>{UI.keepOpen=!UI.keepOpen},guideToggle:()=>{UI.guideOpen=!UI.guideOpen},
+  matInfo:e=>{const back=UI.selItem;modal(matInfoHtml(e.k)+`<div class="row" style="margin-top:10px"><span class="sp"></span>${btn('close','Close',{cls:'gold'})}</div>`)},
   equipBest:()=>{const s=S();let n=0;for(const sl of D.SLOTS){let best=null;for(const it of s.inv)if(it.slot===sl&&isUpgrade(it)&&(!best||powerWith(sl,it)>powerWith(sl,best)))best=it;if(best){equipItem(best);n++}}toast(n?`Equipped ${n} upgrade${n>1?'s':''}`:'Already wearing your best gear')},
   qol:e=>buyQol(e.id),guild:e=>buyGuild(e.id),satchel:()=>buySatchel(),plot:()=>buyPlot(),
   ascend:e=>{if(!canAscend())return;const g=shardPreview();if(e.ok!=='1'){modal(`<h2>🌟 Ascend for 🌠${fmt(g)} Stardust?</h2>${keepHtml()}<div class="row" style="margin-top:10px">${btn('ascend','🌟 Ascend',{data:{ok:1},cls:'gold'})}<span class="sp"></span>${btn('close','Not yet')}</div>`);return}closeModal();ascend();UI.enemyEls.forEach(el=>el.remove());UI.enemyEls.clear();curBg=null;banner('🌟 ASCENDED');save()},
