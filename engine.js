@@ -1,8 +1,12 @@
 'use strict';
 /* Realms of Ember — simulation engine (no DOM) */
-const G = {S:null, d:null, h:null, cb:null, ev:[], fx:true, dirty:true, logCb:null, now:()=>Date.now()};
+const G = {S:null, d:null, h:null, cb:null, ev:[], fx:true, dirty:true, logCb:null, now:()=>Date.now(), holdSave:false, saveError:null};
 const R=(a,b)=>a+Math.random()*(b-a), RI=(a,b)=>Math.floor(R(a,b+1)), pick=a=>a[Math.floor(Math.random()*a.length)], chance=p=>Math.random()<p;
 const SAVE_KEY='realmsOfEmber.save.v1';
+const SAVE_BACKUP_KEY='realmsOfEmber.save.backups';
+const SAVE_BROKEN_KEY='realmsOfEmber.save.broken';
+const SAVE_META_KEY='realmsOfEmber.meta.v1';
+const SAVE_REMIND_MS=3*24*60*60*1000;
 
 function fmt(n){
   if(n===Infinity)return '∞'; if(n==null||isNaN(n))return '0';
@@ -39,7 +43,7 @@ function newState(){
   for(const p of D.PROF_ORDER){s.profs[p]={lvl:1,xp:0};s.stats.profMax[p]=1}
   return s;
 }
-function deepFill(t,src){for(const k in src){if(t[k]===undefined)t[k]=JSON.parse(JSON.stringify(src[k]));else if(src[k]&&typeof src[k]==='object'&&!Array.isArray(src[k])&&typeof t[k]==='object')deepFill(t[k],src[k])}return t}
+function deepFill(t,src){for(const k in src){if(t[k]===undefined||t[k]===null)t[k]=JSON.parse(JSON.stringify(src[k]));else if(src[k]&&typeof src[k]==='object'&&!Array.isArray(src[k])&&t[k]&&typeof t[k]==='object'&&!Array.isArray(t[k]))deepFill(t[k],src[k])}return t}
 
 function log(msg,cat='info'){const S=G.S;S.log.unshift({t:Date.now(),m:msg,c:cat});if(S.log.length>150)S.log.length=150;if(G.logCb)G.logCb()}
 function emit(e){if(G.fx){G.ev.push(e);if(G.ev.length>300)G.ev.splice(0,100)}}
@@ -586,8 +590,40 @@ function autoFirst(c){const cl=G.S.classes[c];const f=D.CLASSES[c].skills[0].id;
 function giveStarter(){const S=G.S;autoFirst(S.cls);const it=makeItem(1,0,'weapon');it.aff=[];it.n='Splintered Training '+D.CLASSES[S.cls].wn[0];S.equip.weapon=it}
 
 /* ---------- save / load / offline ---------- */
-function serialize(){G.S.last=Date.now();return JSON.stringify(G.S)}
-function save(){try{localStorage.setItem(SAVE_KEY,serialize())}catch(e){}}
+function serialize(){G.S.last=G.now();return JSON.stringify(G.S)}
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){localStorage.setItem(k,v)}
+function loadMeta(){try{return Object.assign({iosPrompt:0,lastExport:0,lastRemind:0},JSON.parse(lsGet(SAVE_META_KEY)||'{}'))}catch(e){return {iosPrompt:0,lastExport:0,lastRemind:0}}}
+function saveMeta(m){try{lsSet(SAVE_META_KEY,JSON.stringify(m))}catch(e){}}
+function markExported(now){const m=loadMeta();m.lastExport=now||Date.now();m.lastRemind=m.lastExport;saveMeta(m)}
+function markReminded(now){const m=loadMeta();m.lastRemind=now||Date.now();saveMeta(m)}
+function markIosPromptSeen(){const m=loadMeta();m.iosPrompt=Date.now();saveMeta(m)}
+function shouldShowIosPrompt(){return !loadMeta().iosPrompt}
+function shouldRemindExport(now){now=now||Date.now();if(!G.S||!G.S.started)return false;const m=loadMeta();if(now-(G.S.created||now)<SAVE_REMIND_MS)return false;if(m.lastExport&&now-m.lastExport<SAVE_REMIND_MS)return false;if(m.lastRemind&&now-m.lastRemind<SAVE_REMIND_MS)return false;return true}
+function requestPersist(){try{if(typeof navigator!=='undefined'&&navigator.storage&&navigator.storage.persist)return navigator.storage.persist()}catch(e){}return Promise.resolve(false)}
+function readBackups(){try{const a=JSON.parse(lsGet(SAVE_BACKUP_KEY)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}}
+function dayKey(t){const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function pushBackup(raw,now){if(!raw)return;now=now||Date.now();let t=now;try{const s=JSON.parse(raw);if(s&&s.last)t=s.last}catch(e){}
+  const list=readBackups();if(list[0]&&list[0].raw===raw)return;list.unshift({t,raw});
+  const keep=list.slice(0,3);const today=dayKey(now);const daily=list.find(x=>dayKey(x.t)!==today);
+  if(daily&&!keep.some(k=>k.t===daily.t))keep.push(daily);
+  const tryWrite=arr=>{lsSet(SAVE_BACKUP_KEY,JSON.stringify(arr))};
+  try{tryWrite(keep)}catch(e){try{tryWrite(keep.slice(0,2))}catch(e2){try{tryWrite(keep.slice(0,1))}catch(e3){}}}}
+function listBackups(){return readBackups()}
+function backupLabel(b){try{return new Date(b.t).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}catch(e){return 'earlier save'}}
+function confirmHardReset(typed){return String(typed||'').trim()==='RESET'}
+function exportRaw(json){return btoa(unescape(encodeURIComponent(json)))}
+function save(opts){if(G.holdSave)return false;opts=opts||{};
+  try{const raw=serialize();const prev=lsGet(SAVE_KEY);if(prev&&prev!==raw&&!opts.skipBackup)pushBackup(prev,G.now());lsSet(SAVE_KEY,raw);G.saveError=null;return true}
+  catch(e){G.saveError=e;console.warn('Save failed',e);return false}}
+function tryLoad(){
+  const raw=lsGet(SAVE_KEY);
+  if(!raw)return {status:'empty'};
+  try{loadFrom(raw);G.holdSave=false;return {status:'ok'}}
+  catch(e){console.warn('Save load failed',e);G.holdSave=true;
+    try{lsSet(SAVE_BROKEN_KEY,raw)}catch(e2){}
+    return {status:'broken',error:String(e&&e.message||e),raw,backups:readBackups()}}
+}
 /* v1 -> v2 save migration. Levels are converted by equivalent play time: hours a v1 player needed for a level
    (measured with the v1 engine at 1x) mapped onto hours the v2 curve needs (measured with sim.js, AP spending on). */
 const MIG={
@@ -643,9 +679,17 @@ function migrate3(s){if((s.v||1)>=3)return null;s.v=3;s.stars=s.stars||{};s.star
   while(s.settings.filter.length<D.RARITIES.length)s.settings.filter.push('keep');
   return {refund,mapped}}
 function migrate(s){const a=migrate2(s),b=migrate3(s);if(!a&&!b)return null;return Object.assign({from:a?a.from:2,gen:0,cl:0,pr:0,rescaled:[]},a||{},{v3:b})}
-function loadFrom(json){const s=JSON.parse(json);deepFill(s,newState());G.migration=migrate(s);G.S=s;syncSlots();G.dirty=true;recalc();newHero();return s}
-function exportSave(){return btoa(unescape(encodeURIComponent(serialize())))}
-function importSave(str){const json=decodeURIComponent(escape(atob(str.trim())));loadFrom(json);save()}
+function applyLoaded(s){G.S=s;syncSlots();G.dirty=true;recalc();newHero();return s}
+function loadFrom(json){const parsed=JSON.parse(json);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new Error('invalid save');
+  const src=JSON.parse(JSON.stringify(parsed));
+  const work=JSON.parse(JSON.stringify(src));deepFill(work,newState());
+  try{const migration=migrate(work);applyLoaded(work);G.migration=migration;return work}
+  catch(e){console.warn('Save migration failed',e);
+    const fallback=JSON.parse(JSON.stringify(src));deepFill(fallback,newState());
+    applyLoaded(fallback);G.migration=null;return fallback}}
+function exportSave(){return exportRaw(serialize())}
+function importSave(str){const json=decodeURIComponent(escape(atob(str.trim())));loadFrom(json);G.holdSave=false;save();return G.S}
+function restoreBackup(i){const b=readBackups()[i];if(!b||!b.raw)return false;loadFrom(b.raw);G.holdSave=false;save({skipBackup:true});return true}
 function snapshot(){const S=G.S;return {gold:S.gold,kills:S.stats.kills,lv:S.classes[S.cls].lvl,profs:D.PROF_ORDER.map(p=>S.profs[p].lvl),found:S.stats.found.slice(),relics:Object.keys(S.relics).length,zone:S.stats.everCleared,ap:S.stats.apEarned||0,mats:Object.assign({},S.mats)}}
 function simulate(seconds,step=1){const fx=G.fx;G.fx=false;let t=0;while(t<seconds){const dt=Math.min(step,seconds-t);tick(dt);t+=dt;if(Math.floor(t)%30===0)checkAch()}G.fx=fx;G.ev.length=0;checkAch()}
 function offlineProgress(){const S=G.S;const el=Math.min(offlineCap(),(Date.now()-S.last)/1000);if(el<30)return null;const before=snapshot();const t0=performance.now();

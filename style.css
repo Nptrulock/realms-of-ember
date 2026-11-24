@@ -340,3 +340,10 @@ ul.small{padding-left:18px;margin:6px 0}ul.small li{margin:4px 0}
 .srcl{margin:4px 0;padding-left:18px}.srcl li{margin:3px 0}
 .guide{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px;margin-bottom:6px}
 .gi.none{opacity:.6}
+
+/* ---- v3.2 saves: iOS Home Screen + backup callouts ---- */
+.saveCallout{margin:8px 0;padding:10px 12px;background:#2a1a12;border:1px solid var(--gold);border-radius:10px}
+.iosSteps{padding-left:22px;margin:8px 0} .iosSteps li{margin:8px 0}
+.shareIos{display:inline-block;width:1.05em;height:.85em;border:2px solid var(--gold2);border-top:0;border-radius:0 0 3px 3px;position:relative;vertical-align:-2px;margin:0 4px 0 2px}
+.shareIos:before{content:'';position:absolute;left:50%;bottom:100%;width:2px;height:.55em;background:var(--gold2);transform:translateX(-50%)}
+.shareIos:after{content:'';position:absolute;left:50%;bottom:calc(100% + .28em);width:.4em;height:.4em;border-top:2px solid var(--gold2);border-right:2px solid var(--gold2);transform:translateX(-50%) rotate(-45deg)}

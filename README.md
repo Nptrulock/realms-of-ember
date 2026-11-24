@@ -47,7 +47,18 @@ A deep, deliberately grindy incremental idle RPG in an original high-fantasy set
   - Mining, Herbalism, Smithing, Alchemy, Cooking, Enchanting
   - **Summoning, Dancing, Praying, Advising, Bard, Fishing**
 - **27 relics:** 15 combat relics and 12 profession relics. All are account-wide and survive ascension, with exact odds in the Codex.
-- **Saves:** v1 saves migrate automatically. Levels are rescaled to the new curve by equivalent play time.
+- **Saves:** v1 and v2 saves migrate automatically. Levels from v1 are rescaled to the new curve by equivalent play time. Failed loads are never overwritten; the last 3 saves plus one daily backup are kept on the device. Hard reset asks you to type RESET.
+
+## Saves on iPhone
+Safari may delete all website data for a page that has not been added to the Home Screen after about 7 days without a visit. That wipe cannot be undone from the game — there is no server copy.
+
+To keep a save:
+1. Open the game in Safari, tap Share, then **Add to Home Screen**, and always open it from that icon.
+2. Export a save code from Settings every few days and paste it into Notes.
+
+The game will prompt once (dismissible) if it detects iPhone Safari that is not running as a Home Screen app, and it will gently remind you to export a save code every few days.
+
+`node test-save.js` covers save/load, migrations, backups, and the export-reminder logic.
 
 `sim.js` is a headless balance simulator:
 - `node sim.js class <id> <hours> [noap]`

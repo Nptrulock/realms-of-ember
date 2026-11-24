@@ -9,8 +9,8 @@ function setHTML(el,html){if(!el)return;if(el._h===html)return;if(UI.ptrDown&&el
 document.addEventListener('pointerdown',()=>{UI.ptrDown=true},true);document.addEventListener('pointerup',()=>{setTimeout(()=>{UI.ptrDown=false},30)},true);document.addEventListener('pointercancel',()=>{UI.ptrDown=false},true);
 
 function toast(html,ms=3500){const t=document.createElement('div');t.className='toast';t.innerHTML=html;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),ms);while($('#toasts').children.length>4)$('#toasts').firstChild.remove()}
-function modal(html){const m=$('#modal');m.innerHTML=`<div class="mbox">${html}</div>`;m.classList.remove('hidden')}
-function closeModal(){$('#modal').classList.add('hidden');$('#modal').innerHTML='';UI.selItem=null}
+function modal(html,lock){const m=$('#modal');m.innerHTML=`<div class="mbox">${html}</div>`;m.classList.remove('hidden');UI.lockModal=!!lock}
+function closeModal(){$('#modal').classList.add('hidden');$('#modal').innerHTML='';UI.selItem=null;UI.lockModal=false}
 function bar(p,cls,txt){p=Math.max(0,Math.min(1,p||0));return `<div class="bar ${txt==null?'thin':''}"><i class="${cls}" style="width:${p*100}%"></i>${txt!=null?`<span>${txt}</span>`:''}</div>`}
 function btn(a,label,o={}){const attrs=Object.entries(o.data||{}).map(([k,v])=>`data-${k}="${esc(v)}"`).join(' ');return `<button class="btn ${o.cls||''} ${o.dis?'dis':''}" data-a="${a}" ${attrs} ${o.title?`title="${esc(o.title)}"`:''}>${label}</button>`}
 function costTxt(c,cur='🪙'){return `${cur} ${fmt(c)}`}
@@ -535,7 +535,10 @@ P.settings=()=>{const s=S(),st=s.settings;
   ${filt}
   <h3>Visuals</h3><div class="row">${toggle('particles','✨ Particles')}${toggle('numbers','🔢 Damage numbers')}${toggle('shake','📳 Screen shake')}</div>
   <h3>Save</h3><p class="muted">Autosaves every 10s to this browser. Offline progress: ${Math.round(offlineRate()*100)}% of online rate, capped at ${fmtTime(offlineCap())}.</p>
-  <div class="row">${btn('saveNow','💾 Save now')}${btn('export','📤 Export')}${btn('import','📥 Import')}${btn('rename','✏️ Rename hero')}<span class="sp"></span>${btn('hardReset','🗑️ Hard reset',{cls:'red'})}</div>
+  ${iosSettingsHint()}${exportStatusHtml()}
+  <div class="row">${btn('saveNow','💾 Save now')}${btn('export','📤 Export save code')}${btn('import','📥 Import')}${btn('rename','✏️ Rename hero')}</div>
+  ${backupRow()}
+  <div class="row" style="margin-top:8px"><span class="sp"></span>${btn('hardReset','🗑️ Hard reset',{cls:'red'})}</div>
   <p class="muted" style="margin-top:14px">Realms of Ember · original fantasy setting · made for Noah.</p>`};
 
 function renderTabs(){const s=S();const pts=s.classes[s.cls].pts>0;const tb=$('#tabs');const before=tb._h;const setT=(el,h)=>{if(el._h!==h){el._h=h;el.innerHTML=h}};setT(tb,TABS.map(([k,l])=>{const [ic,...rest]=l.split(' ');return `<button data-a="tab" data-t="${k}" class="${UI.tab===k?'on':''}"><span class="ti">${ic}</span><span class="tl">${rest.join(' ')||'Settings'}</span>${k==='skills'&&pts?'<span class="dot"></span>':''}</button>`}).join(''));
@@ -551,7 +554,7 @@ function renderPanel(force){const pn=$('#panel');if(!force&&(UI.busyInput||pn.co
 /* ---------------- actions ---------------- */
 const A={
   tab:e=>goTab(e.t),
-  pickStart:e=>{const s=S();s.name=($('#heroName').value||'Hero').slice(0,18);s.cls=e.c;s.started=true;giveStarter();recalc();newHero();closeModal();log(`⚔️ ${esc(s.name)} the ${D.CLASSES[e.c].n} sets out from Emberhold.`,'level');save();renderPanel(true)},
+  pickStart:e=>{const s=S();s.name=($('#heroName').value||'Hero').slice(0,18);s.cls=e.c;s.started=true;giveStarter();recalc();newHero();closeModal();log(`⚔️ ${esc(s.name)} the ${D.CLASSES[e.c].n} sets out from Emberhold.`,'level');save();renderPanel(true);maybeBootTips()},
   zone:e=>{const s=S();setZone(+e.i);if(!s.slots[0].act||s.slots[0].act.type!=='combat')assign(0,{type:'combat'})},
   boss:()=>{S().bossReq=true;S().bossRetry=0},
   goFight:()=>assign(0,{type:'combat'}),
@@ -581,7 +584,7 @@ const A={
   sell:e=>{const it=S().inv.find(x=>x.id==e.id);if(it)sellItem(it);closeModal()},
   salvage:e=>{const it=S().inv.find(x=>x.id==e.id);if(it)salvageItem(it);closeModal()},
   lock:e=>{const s=S();if(s.locked[e.id])delete s.locked[e.id];else s.locked[e.id]=1;itemModal(e.id,false)},
-  close:()=>closeModal(),showOff:()=>{const r=UI.pendingOff;UI.pendingOff=null;if(r)showOffline(r);else closeModal()},
+  close:()=>{closeModal();maybeBootTips()},showOff:()=>{const r=UI.pendingOff;UI.pendingOff=null;if(r)showOffline(r);else{closeModal();maybeBootTips()}},
   sort:e=>{UI.invSort=e.k},
   bulk:e=>{const s=S(),r=+e.r;const list=s.inv.filter(it=>it.r<=r&&!s.locked[it.id]);if(!list.length)return toast('Nothing to '+e.m);
     if(r>=3&&e.ok!=='1'){const by=D.RARITIES.map((x,i)=>[i,list.filter(it=>it.r===i).length]).filter(([i,c])=>c&&i>=3);const val=list.reduce((a,it)=>a+(e.m==='sell'?itemValue(it)*(G.d.sellMult||1):itemDust(it)),0);
@@ -604,19 +607,29 @@ const A={
   logf:e=>{UI.logFilter=e.c},
   toggleSet:e=>{const st=S().settings;st[e.k]=!st[e.k]},
   filter:e=>{S().settings.filter[+e.r]=e.v},
-  saveNow:()=>{save();toast('💾 Saved')},
-  export:()=>{const code=exportSave();modal(`<h2>📤 Export save</h2><textarea rows="6" readonly onclick="this.select()">${code}</textarea><div class="row" style="margin-top:8px">${btn('copySave','📋 Copy')}<span class="sp"></span>${btn('close','Close')}</div>`)},
-  copySave:()=>{const t=document.querySelector('#modal textarea');t.select();(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).then(()=>toast('Copied'),()=>{document.execCommand('copy');toast('Copied')})},
-  import:()=>modal(`<h2>📥 Import save</h2><textarea rows="6" id="impTxt" placeholder="Paste save code"></textarea><div class="row" style="margin-top:8px">${btn('doImport','Import',{cls:'gold'})}<span class="sp"></span>${btn('close','Cancel')}</div>`),
-  doImport:()=>{try{importSave($('#impTxt').value);closeModal();UI.enemyEls.forEach(el=>el.remove());UI.enemyEls.clear();curBg=null;toast('Save imported')}catch(err){toast('❌ Invalid save code')}},
+  saveNow:()=>{if(G.holdSave){toast('Save is paused until you restore or start a new game');return}if(save())toast('💾 Saved');else toast('⚠️ Could not save — storage may be full. Export a save code.')},
+  export:()=>showExportModal(),
+  copySave:()=>{const t=document.querySelector('#modal textarea');if(!t)return;copySaveText(t.value)},
+  import:()=>modal(`<h2>📥 Import save</h2><p class="small muted">Paste a save code you exported earlier. This replaces the current save.</p><textarea rows="6" id="impTxt" placeholder="Paste save code"></textarea><div class="row" style="margin-top:8px">${btn('doImport','Import',{cls:'gold'})}<span class="sp"></span>${btn('close','Cancel')}</div>`),
+  doImport:()=>{try{importSave($('#impTxt').value);closeModal();UI.enemyEls.forEach(el=>el.remove());UI.enemyEls.clear();curBg=null;toast('Save imported');renderPanel(true);renderTop()}catch(err){toast('❌ Invalid save code')}},
   rename:()=>{const n=prompt('Hero name',S().name);if(n)S().name=n.slice(0,18)},
-  hardReset:()=>{if(confirm('Erase ALL progress, including relics and ascension? This cannot be undone.')&&confirm('Really erase everything?')){localStorage.removeItem(SAVE_KEY);G.S=newState();syncSlots();G.h=null;G.cb=null;recalc();showIntro();renderPanel(true)}},
+  hardReset:()=>modal(`<h2>🗑️ Hard reset</h2><p>This erases all progress, including relics and ascension. Type <b>RESET</b> to confirm.</p><p class="small muted">A backup of your current save is kept on this device, so you can restore it from Settings if this was a mistake.</p><input type="text" id="resetTxt" placeholder="Type RESET" autocomplete="off" autocapitalize="characters"><div class="row" style="margin-top:8px">${btn('doHardReset','Erase everything',{cls:'red'})}<span class="sp"></span>${btn('close','Cancel')}</div>`),
+  doHardReset:()=>{if(!confirmHardReset($('#resetTxt')&&$('#resetTxt').value)){toast('Type RESET to confirm');return}const prev=lsGet(SAVE_KEY);if(prev)pushBackup(prev);localStorage.removeItem(SAVE_KEY);G.holdSave=false;G.S=newState();syncSlots();G.h=null;G.cb=null;recalc();closeModal();showIntro();renderPanel(true)},
+  showIos:()=>showIosInstall(),
+  dismissIos:()=>{markIosPromptSeen();closeModal();maybeBootTips()},
+  dismissRemind:()=>{markReminded();closeModal()},
+  doRestore:e=>{if(!restoreBackup(+e.i)){toast('Could not restore that backup');return}closeModal();UI.enemyEls.forEach(el=>el.remove());UI.enemyEls.clear();curBg=null;toast('Backup restored');renderPanel(true);renderTop();if(!S().started)showIntro()},
+  restoreMenu:()=>showRestoreMenu(),
+  exportBroken:()=>{const raw=lsGet(SAVE_BROKEN_KEY);if(!raw){toast('Nothing to export');return}showExportModal(exportRaw(raw),true)},
+  abandonSave:()=>modal(`<h2>Start a new game?</h2><p>The save that failed to load will stay available to export, but a new hero will take its place. Type <b>RESET</b> to confirm.</p><input type="text" id="resetTxt" placeholder="Type RESET" autocomplete="off" autocapitalize="characters"><div class="row" style="margin-top:8px">${btn('doAbandon','Start new game',{cls:'red'})}<span class="sp"></span>${btn('showBroken','Back')}</div>`),
+  doAbandon:()=>{if(!confirmHardReset($('#resetTxt')&&$('#resetTxt').value)){toast('Type RESET to confirm');return}G.holdSave=false;G.S=newState();syncSlots();G.h=null;G.cb=null;recalc();closeModal();showIntro();renderPanel(true)},
+  showBroken:()=>showBrokenSave(G.brokenSave||{error:'This save could not be read.',backups:listBackups()}),
 };
 document.addEventListener('click',ev=>{let el=ev.target.closest('[data-a]');if(el&&el.classList.contains('mat')&&!ev.target.closest('.mq')){const outer=el.parentElement&&el.parentElement.closest('[data-a]');if(outer)el=outer}if(!el)return;if(el.classList.contains('dis'))return;const f=A[el.dataset.a];if(f){f(el.dataset);renderTop();renderSlots();if(!$('#modal').contains(el)||el.dataset.a!=='lock')renderPanel(true)}});
 document.addEventListener('input',ev=>{const k=ev.target.dataset&&ev.target.dataset.in;if(!k)return;const v=+ev.target.value;if(k==='smithTarget')S().ps.smithing.target=v;if(k==='quaffAt')S().settings.quaffAt=v;UI.busyInput=true});
 document.addEventListener('change',ev=>{if(ev.target.dataset&&ev.target.dataset.sel==='sumRole'){const su=S().summons.find(x=>x.uid==ev.target.dataset.uid);if(su){su.role=ev.target.value;G.dirty=true}renderPanel(true);return}if(ev.target.dataset&&ev.target.dataset.in){UI.busyInput=false;renderPanel(true)}});
 document.addEventListener('pointerup',()=>{if(UI.busyInput)setTimeout(()=>{UI.busyInput=false},50)});
-$('#modal').addEventListener('click',ev=>{if(ev.target.id==='modal'&&S().started)closeModal()});
+$('#modal').addEventListener('click',ev=>{if(ev.target.id==='modal'&&S().started&&!G.holdSave&&!UI.lockModal){closeModal();maybeBootTips()}});
 
 /* ---------------- loop ---------------- */
 let lastT=performance.now(),acc=0,lastSave=Date.now(),lastAch=0,lastStrip=0;
@@ -630,7 +643,7 @@ function frame(now){
     if(now-lastStrip>250){lastStrip=now;renderTop();renderSlots();renderHud()}
     if(now-(UI.lastXs||0)>1000){UI.lastXs=now;sampleXp()}
     if(now-UI.lastPanel>1000)renderPanel(false);
-    if(Date.now()-lastSave>10000){lastSave=Date.now();save()}
+    if(Date.now()-lastSave>10000){lastSave=Date.now();if(!G.holdSave){const ok=save();if(!ok&&!UI.saveFailToast){UI.saveFailToast=true;toast('⚠️ Could not save — storage may be full. Export a save code.')}}}
   }
   requestAnimationFrame(frame);
 }
@@ -663,15 +676,48 @@ function v3Html(v){return `<h3>🌌 v3 — the Star Chart</h3><ul class="small">
   <li><b>Bulk sell any rarity</b> (Epic+ asks first) and 🔒 lock items right on the tile.</li></ul>`}
 function showMigration3(m,off){modal(`<h2>🔥 Realms of Ember v3</h2>${v3Html(m.v3||{refund:0,mapped:[]})}<div class="row"><span class="sp"></span>${btn(off?'showOff':'close','Onward!',{cls:'gold'})}</div>`);UI.pendingOff=off}
 /* ---------------- boot ---------------- */
+function isIOSDevice(){const ua=navigator.userAgent||'';if(/iPad|iPhone|iPod/.test(ua))return true;if(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)return true;return false}
+function isStandalone(){return window.navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)}
+function needsIosInstall(){return isIOSDevice()&&!isStandalone()}
+function shareIcon(){return '<span class="shareIos" title="Share"></span>'}
+function iosSettingsHint(){if(!needsIosInstall())return isStandalone()?`<p class="small">✅ Opened from the Home Screen — Safari will keep this save.</p>`:'';
+  return `<div class="saveCallout"><b>On iPhone, add this game to your Home Screen.</b><div class="small muted" style="margin:4px 0 8px">Safari may erase website data after 7 days for pages you only open in a tab. A Home Screen icon keeps your save.</div>${btn('showIos','How to add it',{cls:'gold sm'})}</div>`}
+function exportStatusHtml(){const m=loadMeta();let when='You have not exported a backup yet.';if(m.lastExport){const days=Math.floor((Date.now()-m.lastExport)/86400000);when=days<=0?'Last backup copied today.':days===1?'Last backup copied yesterday.':`Last backup copied ${days} days ago.`}
+  return `<p class="small">${when} Copy a save code into Notes as a second backup — that is the only copy that survives if this browser clears its data.</p>`}
+function backupRow(){const n=listBackups().length;return n?`<div class="row" style="margin-top:6px">${btn('restoreMenu',`♻️ Restore a backup (${n})`,{cls:'sm'})}</div>`:''}
+function copySaveText(code){const done=()=>{markExported();toast('Copied — paste it into Notes')};const ta=document.querySelector('#modal textarea');if(ta){ta.value=code;ta.select()}
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(code).then(done,()=>{try{document.execCommand('copy');done()}catch(e){toast('Select the code and copy it')}});
+  else{try{document.execCommand('copy');done()}catch(e){toast('Select the code and copy it')}}}
+function showExportModal(code,fromBroken){code=code||exportSave();if(!fromBroken)try{markExported()}catch(e){}
+  modal(`<h2>📤 Export save</h2><p class="small muted">${fromBroken?'This is the save that failed to load. Paste it somewhere safe (Notes, email to yourself) and send it to the developer if you want help recovering it.':'Paste this code into Notes or a message. It is the only backup that survives if the browser clears its data.'}</p><textarea rows="6" readonly onclick="this.select()">${code}</textarea><div class="row" style="margin-top:8px">${btn('copySave','📋 Copy')}<span class="sp"></span>${btn('close','Close')}</div>`)}
+function showIosInstall(){modal(`<h2>📲 Keep your save on iPhone</h2>
+  <p>Safari may erase this game's save after <b>7 days</b> if you only open it in a tab. Add it to your Home Screen and open it from that icon, and the save is kept.</p>
+  <ol class="iosSteps"><li>Tap the ${shareIcon()} <b>Share</b> button in Safari — a square with an arrow pointing up. On iPhone it is at the bottom of the screen; on iPad it is in the top toolbar.</li>
+  <li>Scroll the list and tap <b>Add to Home Screen</b>.</li>
+  <li>Tap <b>Add</b>, then open <b>Realms of Ember</b> from the new icon.</li></ol>
+  <p class="small muted">Also export a save code from Settings every few days and paste it into Notes, just in case.</p>
+  <div class="row">${btn('export','📤 Export save code')}<span class="sp"></span>${btn('dismissIos','Got it',{cls:'gold'})}</div>`,true)}
+function showExportRemind(){markReminded();modal(`<h2>💾 Backup your save</h2><p>Copy your save code into Notes. On iPhone, Safari can erase website data after 7 days unless the game is opened from a Home Screen icon — a save code is the backup that survives that.</p><div class="row">${btn('export','📤 Export save code',{cls:'gold'})}<span class="sp"></span>${btn('dismissRemind','Maybe later')}</div>`,true)}
+function showRestoreMenu(){const list=listBackups();if(!list.length){toast('No backups on this device');return}
+  modal(`<h2>♻️ Restore a backup</h2><p class="small muted">This replaces your current save. Export first if you want to keep where you are now.</p>${list.map((b,i)=>`<div class="row" style="margin:6px 0">${btn('doRestore',backupLabel(b),{data:{i},cls:'gold'})}</div>`).join('')}<div class="row"><span class="sp"></span>${btn('close','Cancel')}</div>`)}
+function showBrokenSave(info){G.brokenSave=info;G.holdSave=true;
+  const list=(info&&info.backups)||listBackups();
+  const bHtml=list.length?list.map((b,i)=>btn('doRestore',`Restore ${backupLabel(b)}`,{data:{i},cls:'gold'})).join(''):'<p class="muted">No backups were found on this device.</p>';
+  modal(`<h2>⚠️ This save couldn't load</h2><p>Your previous save was kept and has <b>not</b> been overwritten. You can export it or try a backup.</p>${info&&info.error?`<p class="small muted">${esc(info.error)}</p>`:''}<div class="row" style="margin-top:8px">${btn('exportBroken','📤 Export the saved file')}${bHtml}</div><div class="row" style="margin-top:8px">${btn('abandonSave','Start a new game',{cls:'red'})}</div>`,true)}
+function maybeBootTips(){if(G.holdSave)return;if(!S()||!S().started)return;const m=$('#modal');if(m&&!m.classList.contains('hidden'))return;
+  if(needsIosInstall()&&shouldShowIosPrompt()){showIosInstall();return}
+  if(shouldRemindExport())showExportRemind()}
 function boot(){
-  let loaded=false;try{const raw=localStorage.getItem(SAVE_KEY);if(raw){loadFrom(raw);loaded=true}}catch(e){console.warn('Save load failed',e)}
-  if(!loaded){G.S=newState();syncSlots();recalc()}
+  requestPersist();
+  const result=tryLoad();
+  if(result.status!=='ok'){G.S=newState();syncSlots();recalc();if(result.status==='broken')G.holdSave=true}
   if(!G.h)newHero();
   fxResize();window.addEventListener('resize',fxResize);
   renderTabs();renderPanel(true);renderTop();
-  if(!S().started)showIntro();
+  if(result.status==='broken')showBrokenSave(result);
+  else if(!S().started)showIntro();
   else{const el=(Date.now()-S().last)/1000;let r=null;if(el>60)r=catchUp(el);
-    if(G.migration){const m=G.migration;G.migration=null;save();showMigration(m,r)}else if(r)showOffline(r)}
+    if(G.migration){const m=G.migration;G.migration=null;save();showMigration(m,r)}else if(r)showOffline(r);else maybeBootTips()}
   document.addEventListener('visibilitychange',()=>{if(document.hidden)save();else lastT=performance.now()-(Date.now()-S().last)})
   window.addEventListener('pagehide',save);
   requestAnimationFrame(t=>{lastT=t;frame(t)});
